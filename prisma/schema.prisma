@@ -1,0 +1,191 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Models
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String   // Hashed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts  Account[]
+}
+
+model Account {
+  id              String      @id @default(cuid())
+  userId          String
+  name            String
+  type            String      // PERSONAL, PROP, DEMO
+  currency        String      @default("USD")
+  
+  // Balances
+  initialBalance  Float
+  currentBalance  Float       @default(0)
+  equity          Float       @default(0) // For performance tracking
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  trades          Trade[]
+  gridStrategies  GridStrategy[]
+  spotHoldings    SpotHolding[]
+}
+
+model Trade {
+  id              String      @id @default(cuid())
+  accountId       String
+  
+  // Common Fields
+  type            String      // SPOT, FUTURES
+  symbol          String
+  side            String      // LONG, SHORT
+  entryPrice      Float
+  stopLoss        Float?
+  takeProfit      Float?
+  quantity        Float       // Position size (e.g. BTC amount)
+  
+  openTime        DateTime    @default(now())
+  closeTime       DateTime?
+  exitPrice       Float?
+  status          String      @default("OPEN") // OPEN, CLOSED
+  
+  netPnL          Float?      // Realized PnL
+  netPnLPercent   Float?
+  rMultiple       Float?
+
+  // Futures Specific
+  leverage        Float?      // e.g. 10x
+  marginUsed      Float?
+  marginMode      String?     // ISOLATED, CROSS
+  liquidationPrice Float?
+  maintenanceMargin Float?
+  fundingFees     Float?      @default(0)
+
+  // Journaling
+  setup           String?
+  thesis          String?
+  executionNotes  String?
+  postTradeReview String?
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  account         Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  journalEntries  JournalEntry[]
+  images          Image[]
+}
+
+model GridStrategy {
+  id              String      @id @default(cuid())
+  accountId       String
+  
+  type            String      // SPOT, FUTURES
+  symbol          String
+  
+  // Configuration
+  lowerPrice      Float
+  upperPrice      Float
+  gridCount       Int
+  allocatedCapital Float
+  direction       String      @default("NEUTRAL") // NEUTRAL, LONG, SHORT
+  
+  // Futures Config
+  leverage        Float?
+  marginMode      String?     // ISOLATED, CROSS
+  maintenanceMarginRate Float?
+  liquidationPrice Float?
+  investmentAfterLeverage Float?
+
+  // Tracking
+  entryPrice      Float?      // Initial entry price
+  exitPrice       Float?      // While closing
+  gridProfit      Float?      // Profit from grid trading
+  totalProfit     Float?      // Overall profit
+  closeNote       String?     // Note while closing
+  
+  status          String      @default("ACTIVE") // ACTIVE, STOPPED, CLOSED
+  realizedPnL     Float       @default(0)
+  fees            Float       @default(0)
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  account         Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  orders          GridOrder[]
+  journalEntries  JournalEntry[]
+}
+
+model GridOrder {
+  id              String      @id @default(cuid())
+  gridId          String
+  
+  price           Float
+  quantity        Float
+  side            String      // LONG, SHORT
+  status          String      // PENDING, FILLED
+  
+  filledAt        DateTime?
+  
+  grid            GridStrategy @relation(fields: [gridId], references: [id], onDelete: Cascade)
+}
+
+model SpotHolding {
+  id              String      @id @default(cuid())
+  accountId       String
+  
+  assetSymbol     String      // e.g. BTC
+  quantity        Float
+  avgEntryPrice   Float
+  
+  // Notes
+  notes           String?
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  account         Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+model JournalEntry {
+  id              String      @id @default(cuid())
+  
+  // Links (Optional - can be general or linked)
+  tradeId         String?
+  gridId          String?
+  
+  // Content
+  date            DateTime    @default(now())
+  title           String?
+  content         String
+  
+  // Psychology
+  confidence      Int?        // 1-10
+  fear            Int?        // 1-10
+  fomo            Int?        // 1-10
+  discipline      Int?        // 1-10
+  tags            String?     // Comma separated tags if needed, or relation to a Tag model
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  trade           Trade?      @relation(fields: [tradeId], references: [id])
+  grid            GridStrategy? @relation(fields: [gridId], references: [id])
+}
+
+model Image {
+  id        String   @id @default(cuid())
+  url       String
+  tradeId   String?
+  trade     Trade?   @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
