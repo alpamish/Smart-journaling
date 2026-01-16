@@ -49,7 +49,7 @@ export default function CloseGridForm({
                     </button>
                 </div>
 
-                <form action={formAction} className="space-y-8 text-left">
+                <form action={formAction} className="space-y-8 text-left text-slate-500">
                     {/* Exit Price Field */}
                     <div className="group">
                         <label htmlFor="exitPrice" className="block text-sm font-semibold text-gray-800 mb-2 group-focus-within:text-red-600 transition-colors">

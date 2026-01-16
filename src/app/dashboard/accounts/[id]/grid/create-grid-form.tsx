@@ -56,7 +56,7 @@ export default function CreateGridForm({ accountId, close }: { accountId: string
                     }
                 `}} />
 
-                <form action={formAction} className="space-y-6 text-left">
+                <form action={formAction} className="space-y-6 text-left text-slate-500">
                     {/* Strategy Type Toggle */}
                     <div className="flex rounded-xl bg-gray-100/80 p-1.5 ring-1 ring-gray-200">
                         <button

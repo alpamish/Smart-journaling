@@ -1,8 +1,8 @@
 'use client';
 
 import {
-    LineChart,
-    Line,
+    AreaChart,
+    Area,
     XAxis,
     YAxis,
     CartesianGrid,
@@ -12,35 +12,60 @@ import {
 
 export default function EquityChart({ data }: { data: any[] }) {
     if (!data || data.length === 0) {
-        return <div className="text-gray-500 text-sm">Not enough data for chart</div>;
+        return (
+            <div className="premium-card flex h-[350px] items-center justify-center text-muted-foreground">
+                <span className="text-sm">Not enough data for equity chart</span>
+            </div>
+        );
     }
 
     return (
-        <div className="h-[300px] w-full rounded-lg border bg-white p-4 shadow-sm">
-            <h3 className="mb-4 text-lg font-semibold">Equity Curve</h3>
+        <div className="premium-card h-[350px] w-full">
+            <h3 className="mb-6 text-lg font-bold tracking-tight text-foreground">Equity Growth</h3>
             <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                <AreaChart data={data} margin={{ top: 0, right: 0, left: -20, bottom: 40 }}>
+                    <defs>
+                        <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.1} />
+                            <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                        </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
+                    <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }}
+                        axisLine={false}
+                        tickLine={false}
+                    />
                     <YAxis
                         domain={['auto', 'auto']}
-                        tick={{ fontSize: 12 }}
-                        tickFormatter={(value: number) => `$${value}`}
+                        tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }}
+                        axisLine={false}
+                        tickLine={false}
+                        tickFormatter={(value: number) => `$${value.toLocaleString()}`}
                     />
                     <Tooltip
-                        formatter={(value: any) => [`$${value}`, 'Balance']}
-                        contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                        contentStyle={{
+                            backgroundColor: 'var(--card)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '12px',
+                            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                            fontSize: '12px',
+                            color: 'var(--foreground)'
+                        }}
+                        itemStyle={{ color: 'var(--primary)', fontWeight: 'bold' }}
+                        formatter={(value: any) => [`$${value.toLocaleString()}`, 'Balance']}
                     />
-                    <Line
+                    <Area
                         type="monotone"
                         dataKey="balance"
-                        stroke="#2563eb"
-                        strokeWidth={2}
-                        dot={{ r: 3 }}
-                        activeDot={{ r: 5 }}
-                        animationDuration={1000}
+                        stroke="var(--primary)"
+                        strokeWidth={3}
+                        fillOpacity={1}
+                        fill="url(#colorEquity)"
+                        animationDuration={1500}
                     />
-                </LineChart>
+                </AreaChart>
             </ResponsiveContainer>
         </div>
     );

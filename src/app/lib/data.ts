@@ -60,7 +60,7 @@ export async function fetchTradesByAccountId(accountId: string): Promise<Trade[]
                 accountId,
             },
             orderBy: {
-                openTime: 'desc',
+                entryDate: 'desc',
             },
         });
         return trades;
@@ -119,7 +119,7 @@ export async function fetchAnalyticsData(accountId: string) {
                 accountId,
                 status: 'CLOSED'
             },
-            orderBy: { closeTime: 'asc' }
+            orderBy: { exitDate: 'asc' }
         });
 
         // 1. Calculate Stats
@@ -146,7 +146,7 @@ export async function fetchAnalyticsData(accountId: string) {
             const pnl = trade.netPnL || 0;
             runningBalance += pnl;
             // Simplified date for chart
-            const dateStr = trade.closeTime ? new Date(trade.closeTime).toLocaleDateString() : 'N/A';
+            const dateStr = trade.exitDate ? new Date(trade.exitDate).toLocaleDateString() : 'N/A';
 
             equityCurve.push({
                 date: dateStr,

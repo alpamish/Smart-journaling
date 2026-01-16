@@ -1,55 +1,82 @@
-import { TrendingUp, TrendingDown, Activity, DollarSign } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, DollarSign, Target, BarChart3 } from 'lucide-react';
 
 export default function StatsCards({ stats }: { stats: any }) {
     if (!stats) return null;
 
     return (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {/* Total PnL */}
-            <div className="rounded-lg border bg-white p-4 shadow-sm">
+            <div className="stat-card text-foreground group">
                 <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-500">Total PnL</p>
-                    <DollarSign className={`h-4 w-4 ${Number(stats.totalPnL) >= 0 ? 'text-green-500' : 'text-red-500'}`} />
+                    <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total PnL</p>
+                    <div className={`rounded-full p-2 ${Number(stats.totalPnL) >= 0 ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'}`}>
+                        <DollarSign className="h-5 w-5" />
+                    </div>
                 </div>
-                <p className={`mt-2 text-2xl font-bold ${Number(stats.totalPnL) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <p className={`text-3xl font-bold tracking-tight ${Number(stats.totalPnL) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                     ${stats.totalPnL}
                 </p>
+                <div className="flex items-center gap-1 text-xs">
+                    <span className={Number(stats.totalPnL) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                        {Number(stats.totalPnL) >= 0 ? 'Profitable' : 'Drawdown'}
+                    </span>
+                </div>
             </div>
 
             {/* Win Rate */}
-            <div className="rounded-lg border bg-white p-4 shadow-sm">
+            <div className="stat-card text-foreground group">
                 <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-500">Win Rate</p>
-                    <Activity className="h-4 w-4 text-blue-500" />
+                    <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Win Rate</p>
+                    <div className="rounded-full bg-blue-500/10 p-2 text-blue-600">
+                        <Target className="h-5 w-5" />
+                    </div>
                 </div>
-                <p className="mt-2 text-2xl font-bold text-gray-900">
-                    {stats.winRate}%
-                </p>
-                <p className="text-xs text-gray-500">{stats.totalTrades} Trades</p>
+                <div className="flex items-baseline gap-2">
+                    <p className="text-3xl font-bold tracking-tight text-foreground">{stats.winRate}%</p>
+                    <p className="text-xs text-muted-foreground">/ 100%</p>
+                </div>
+                <p className="text-xs text-muted-foreground">Based on {stats.totalTrades} trades</p>
             </div>
 
             {/* Profit Factor */}
-            <div className="rounded-lg border bg-white p-4 shadow-sm">
+            <div className="stat-card text-foreground group">
                 <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-500">Profit Factor</p>
-                    <TrendingUp className="h-4 w-4 text-purple-500" />
+                    <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Profit Factor</p>
+                    <div className="rounded-full bg-purple-500/10 p-2 text-purple-600">
+                        <Activity className="h-5 w-5" />
+                    </div>
                 </div>
-                <p className="mt-2 text-2xl font-bold text-gray-900">
-                    {stats.profitFactor}
-                </p>
-            </div>
-
-            {/* Avg Win / Loss Ratio (Simplified visual) */}
-            <div className="rounded-lg border bg-white p-4 shadow-sm">
-                <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-500">Avg Win / Loss</p>
-                    <TrendingDown className="h-4 w-4 text-orange-500" />
-                </div>
-                <div className="mt-2 text-sm">
-                    <span className="font-semibold text-green-600">${stats.avgWin}</span> / <span className="font-semibold text-red-600">${stats.avgLoss === '0.00' ? '-' : stats.avgLoss}</span>
+                <p className="text-3xl font-bold tracking-tight text-foreground">{stats.profitFactor}</p>
+                <div className="flex items-center gap-2">
+                    <div className="h-1.5 w-full rounded-full bg-muted">
+                        <div
+                            className="h-1.5 rounded-full bg-purple-500"
+                            style={{ width: `${Math.min((Number(stats.profitFactor) / 3) * 100, 100)}%` }}
+                        />
+                    </div>
                 </div>
             </div>
 
+            {/* Avg Win / Loss Ratio */}
+            <div className="stat-card text-foreground group">
+                <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Avg Win/Loss</p>
+                    <div className="rounded-full bg-orange-500/10 p-2 text-orange-600">
+                        <BarChart3 className="h-5 w-5" />
+                    </div>
+                </div>
+                <div className="flex items-center gap-3">
+                    <div>
+                        <p className="text-sm font-semibold text-green-600 dark:text-green-400">${stats.avgWin}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase">Avg Win</p>
+                    </div>
+                    <div className="h-8 w-px bg-border" />
+                    <div>
+                        <p className="text-sm font-semibold text-red-600 dark:text-red-400">${stats.avgLoss === '0.00' ? '-' : stats.avgLoss}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase">Avg Loss</p>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }

@@ -25,6 +25,7 @@ export default function CloseTradeButton({ trade }: { trade: any }) {
                     accountId={trade.accountId}
                     symbol={trade.symbol}
                     side={trade.side}
+                    quantity={trade.quantity}
                     onClose={() => setIsOpen(false)}
                 />
             )}

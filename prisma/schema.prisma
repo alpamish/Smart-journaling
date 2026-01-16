@@ -46,36 +46,56 @@ model Trade {
   accountId       String
   
   // Common Fields
-  type            String      // SPOT, FUTURES
+  type            String      // FUTURES (Spot removed from form, but kept in DB for legacy or other uses if needed)
+  segment         String?     // CRYPTO, STOCK, FOREX
   symbol          String
   side            String      // LONG, SHORT
-  entryPrice      Float
-  stopLoss        Float?
-  takeProfit      Float?
-  quantity        Float       // Position size (e.g. BTC amount)
   
-  openTime        DateTime    @default(now())
-  closeTime       DateTime?
-  exitPrice       Float?
-  status          String      @default("OPEN") // OPEN, CLOSED
+  // Setup & Mode
+  marginMode      String?     // ISOLATED, CROSS
+  tradeType       String?     // SCALPING, INTRADAY, SWING, POSITIONAL
+  session         String?     // MORNING, AFTERNOON, EVENING, NIGHT
   
-  netPnL          Float?      // Realized PnL
-  netPnLPercent   Float?
-  rMultiple       Float?
+  // Timeframes
+  analysisTimeframe String?
+  entryTimeframe    String?
 
-  // Futures Specific
+  // Entry Details
+  entryPrice      Float
+  entryDate       DateTime    @default(now())
+  entryCondition  String?
+  
+  // Risk & Position
+  stopLoss        Float?
+  takeProfit      Float?      // Target
+  quantity        Float       // Position size (e.g. BTC amount)
   leverage        Float?      // e.g. 10x
   marginUsed      Float?
-  marginMode      String?     // ISOLATED, CROSS
+  
+  // Exit Details
+  exitPrice       Float?
+  exitDate        DateTime?
+  exitQuantity    Float?
+  exitCondition   String?
+  
+  status          String      @default("OPEN") // OPEN, CLOSED
+  
+  // Performance
+  netPnL          Float?      // Realized PnL (Amount)
+  netPnLPercent   Float?      // Realized PnL (%)
+  rMultiple       Float?
+
+  // Legacy / Additional Futures Fields
   liquidationPrice Float?
   maintenanceMargin Float?
   fundingFees     Float?      @default(0)
 
   // Journaling
-  setup           String?
-  thesis          String?
-  executionNotes  String?
-  postTradeReview String?
+  remarks         String?     // Replaces executionNotes/thesis for new form
+  setup           String?     // Kept for legacy
+  thesis          String?     // Kept for legacy
+  executionNotes  String?     // Kept for legacy
+  postTradeReview String?     // Kept for legacy
   
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
@@ -83,6 +103,15 @@ model Trade {
   account         Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
   journalEntries  JournalEntry[]
   images          Image[]
+}
+
+model TradeCondition {
+  id        String   @id @default(cuid())
+  name      String
+  type      String   // ENTRY, EXIT
+  createdAt DateTime @default(now())
+
+  @@unique([name, type])
 }
 
 model GridStrategy {
@@ -146,6 +175,9 @@ model SpotHolding {
   assetSymbol     String      // e.g. BTC
   quantity        Float
   avgEntryPrice   Float
+  targetPrice     Float?
+  exitPrice       Float?
+  status          String      @default("HODLING")
   
   // Notes
   notes           String?

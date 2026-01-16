@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useEffect } from 'react';
 import { createSpotHolding } from '@/app/lib/actions';
+import { X, Coins, Target, Info, Hash, ArrowUpRight, Save, Layout } from 'lucide-react';
 
 export default function AddHoldingForm({ accountId, close }: { accountId: string, close: () => void }) {
     const createHoldingWithId = createSpotHolding.bind(null, accountId);
@@ -14,53 +15,162 @@ export default function AddHoldingForm({ accountId, close }: { accountId: string
     }, [state, close]);
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
-                <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-xl font-bold">Add Spot Holding</h2>
-                    <button onClick={close} className="text-gray-500 hover:text-gray-700">&times;</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 transition-all duration-300 animate-in fade-in">
+            <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-card/95 shadow-2xl backdrop-blur-md animate-in zoom-in-95 duration-300">
+                {/* Header */}
+                <div className="relative border-b border-white/10 px-6 py-4">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                            <Coins className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-semibold tracking-tight">Add Spot Holding</h2>
+                            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">New Portfolio Position</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={close}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                        aria-label="Close"
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
                 </div>
 
-                <form action={formAction} className="space-y-4">
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Asset Symbol</label>
-                        <input type="text" name="assetSymbol" required placeholder="BTC" className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-blue-500" />
+                <form action={formAction} className="p-6 space-y-6">
+                    {/* Asset Symbol */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold flex items-center gap-2 text-foreground/80">
+                            <Hash className="h-4 w-4 text-primary/60" />
+                            Asset Symbol
+                        </label>
+                        <div className="relative group">
+                            <input
+                                type="text"
+                                name="assetSymbol"
+                                required
+                                placeholder="e.g. BTC"
+                                className="h-11 w-full rounded-xl border border-input bg-background/50 px-4 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all uppercase font-medium"
+                            />
+                        </div>
                     </div>
 
+                    {/* Quantity and Avg Price Grid */}
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Quantity</label>
-                            <input type="number" name="quantity" step="any" required className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-blue-500" />
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold flex items-center gap-2 text-foreground/80">
+                                <Layout className="h-4 w-4 text-primary/60" />
+                                Quantity
+                            </label>
+                            <input
+                                type="number"
+                                name="quantity"
+                                step="any"
+                                required
+                                placeholder="0.00"
+                                className="h-11 w-full rounded-xl border border-input bg-background/50 px-4 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium"
+                            />
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Avg Buy Price</label>
-                            <input type="number" name="avgEntryPrice" step="any" required className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-blue-500" />
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold flex items-center gap-2 text-foreground/80">
+                                <ArrowUpRight className="h-4 w-4 text-primary/60" />
+                                Avg Buy Price
+                            </label>
+                            <input
+                                type="number"
+                                name="avgEntryPrice"
+                                step="any"
+                                required
+                                placeholder="0.00"
+                                className="h-11 w-full rounded-xl border border-input bg-background/50 px-4 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium"
+                            />
                         </div>
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Notes (Optional)</label>
-                        <textarea name="notes" rows={3} className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-blue-500" />
+                    {/* Target Price and Status Grid */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold flex items-center gap-2 text-foreground/80">
+                                <Target className="h-4 w-4 text-primary/60" />
+                                Target Price
+                            </label>
+                            <input
+                                type="number"
+                                name="targetPrice"
+                                step="any"
+                                placeholder="optional"
+                                className="h-11 w-full rounded-xl border border-input bg-background/50 px-4 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold flex items-center gap-2 text-foreground/80">
+                                <Info className="h-4 w-4 text-primary/60" />
+                                Status
+                            </label>
+                            <select
+                                name="status"
+                                defaultValue="HODLING"
+                                className="h-11 w-full rounded-xl border border-input bg-background/50 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium appearance-none cursor-pointer"
+                            >
+                                <option value="HODLING">HODLING</option>
+                                <option value="STAKED">STAKED</option>
+                                <option value="LOCKED">LOCKED</option>
+                                <option value="SOLD">SOLD</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <div className="flex justify-end gap-2 pt-4">
+                    {/* Notes */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold flex items-center gap-2 text-foreground/80">
+                            <Info className="h-4 w-4 text-primary/60" />
+                            Notes
+                        </label>
+                        <textarea
+                            name="notes"
+                            rows={2}
+                            placeholder="Add strategy notes or details..."
+                            className="w-full rounded-xl border border-input bg-background/50 px-4 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all min-h-[80px] resize-none"
+                        />
+                    </div>
+
+                    {/* Error Message */}
+                    {state?.error && (
+                        <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive border border-destructive/20 animate-in slide-in-from-top-1">
+                            <div className="flex items-center gap-2 font-medium">
+                                <X className="h-4 w-4" />
+                                {state.error}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/5">
                         <button
                             type="button"
                             onClick={close}
-                            className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                            className="h-11 rounded-xl px-5 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-all active:scale-95"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={isPending}
-                            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                            className="group relative h-11 flex items-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 active:scale-95 disabled:opacity-50 disabled:pointer-events-none overflow-hidden"
                         >
-                            {isPending ? 'Adding...' : 'Add Holding'}
+                            {isPending ? (
+                                <>
+                                    <div className="h-4 w-4 border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin rounded-full" />
+                                    Processing...
+                                </>
+                            ) : (
+                                <>
+                                    <Save className="h-4 w-4 transition-transform group-hover:scale-110" />
+                                    Add Holding
+                                </>
+                            )}
                         </button>
                     </div>
-                    {state?.error && <p className="text-red-500 text-sm">{state.error}</p>}
                 </form>
             </div>
         </div>

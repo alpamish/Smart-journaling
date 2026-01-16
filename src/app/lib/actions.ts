@@ -7,6 +7,8 @@ import { auth } from '@/auth'; // Added auth import
 import bcrypt from 'bcryptjs';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
 export async function authenticate(
     prevState: string | undefined,
@@ -127,6 +129,13 @@ export async function createAccount(
     redirect('/dashboard');
 }
 
+export async function getTradeConditions(type: 'ENTRY' | 'EXIT') {
+    return await prisma.tradeCondition.findMany({
+        where: { type },
+        orderBy: { name: 'asc' }
+    });
+}
+
 export async function createTrade(
     accountId: string,
     prevState: any,
@@ -135,88 +144,135 @@ export async function createTrade(
     const session = await auth();
     if (!session?.user?.id) return { error: 'Unauthorized' };
 
-    const type = formData.get('type') as 'SPOT' | 'FUTURES';
-    const side = formData.get('side') as 'LONG' | 'SHORT';
+    const type = 'FUTURES';
+    const segment = formData.get('segment') as string;
     const symbol = formData.get('symbol') as string;
+    const side = formData.get('side') as 'LONG' | 'SHORT';
+    const marginMode = formData.get('marginMode') as string;
+    const tradeType = formData.get('tradeType') as string;
+    const sessionName = formData.get('session') as string;
+    const entryDate = formData.get('entryDate') ? new Date(formData.get('entryDate') as string) : new Date();
+    const analysisTimeframe = formData.get('analysisTimeframe') as string;
+    const entryTimeframe = formData.get('entryTimeframe') as string;
+    const entryCondition = formData.get('entryCondition') as string;
+
+    // Risk & Position
+    const stopLoss = formData.get('stopLoss') ? parseFloat(formData.get('stopLoss') as string) : null;
+    const takeProfit = formData.get('takeProfit') ? parseFloat(formData.get('takeProfit') as string) : null;
     const quantity = parseFloat(formData.get('quantity') as string);
     const entryPrice = parseFloat(formData.get('entryPrice') as string);
     const leverage = parseFloat(formData.get('leverage') as string) || 1;
-    const marginMode = formData.get('marginMode') as 'ISOLATED' | 'CROSS' | null;
+    const remarks = formData.get('remarks') as string;
+
+    // Exit Details (if closing while logging)
+    const exitPrice = formData.get('exitPrice') ? parseFloat(formData.get('exitPrice') as string) : null;
+    const exitQuantity = formData.get('exitQuantity') ? parseFloat(formData.get('exitQuantity') as string) : null;
+    const exitCondition = formData.get('exitCondition') as string;
+    const exitDate = exitPrice ? new Date() : null;
 
     if (!symbol || isNaN(quantity) || isNaN(entryPrice)) {
         return { error: 'Invalid input' };
     }
 
-    // Basic validation for Futures
-    if (type === 'FUTURES' && (!leverage || !marginMode)) {
-        return { error: 'Leverage and Margin Mode required for Futures' };
-    }
-
     try {
-        // 1. Fetch Account to check balance/validate
         const account = await prisma.account.findUnique({
             where: { id: accountId, userId: session.user.id }
         });
 
         if (!account) return { error: 'Account not found' };
 
-        // Calculate Margin/Cost
-        let cost = 0;
-        let marginUsed = 0;
-
-        if (type === 'SPOT') {
-            cost = quantity * entryPrice;
-            // Check balance
-            if (side === 'LONG' && cost > account.currentBalance) {
-                return { error: 'Insufficient balance' };
-            }
-        } else {
-            // Futures
-            // Initial Margin = (Entry * Qty) / Leverage
-            marginUsed = (quantity * entryPrice) / leverage;
-            if (marginUsed > account.currentBalance) { // Simplified check (using currentBalance as free margin for now)
-                return { error: 'Insufficient margin' };
-            }
+        const marginUsed = (quantity * entryPrice) / leverage;
+        if (marginUsed > account.currentBalance) {
+            return { error: 'Insufficient margin' };
         }
 
-        // 2. Create Trade
-        await prisma.trade.create({
+        // Handle Trade Condition (Dynamic Insert)
+        if (entryCondition) {
+            await prisma.tradeCondition.upsert({
+                where: { name_type: { name: entryCondition, type: 'ENTRY' } },
+                update: {},
+                create: { name: entryCondition, type: 'ENTRY' },
+            });
+        }
+
+        if (exitCondition) {
+            await prisma.tradeCondition.upsert({
+                where: { name_type: { name: exitCondition, type: 'EXIT' } },
+                update: {},
+                create: { name: exitCondition, type: 'EXIT' },
+            });
+        }
+
+        const trade = await prisma.trade.create({
             data: {
                 accountId,
                 type,
-                side,
+                segment,
                 symbol: symbol.toUpperCase(),
-                quantity,
+                side,
+                marginMode,
+                tradeType,
+                session: sessionName,
+                entryDate,
+                analysisTimeframe,
+                entryTimeframe,
+                entryCondition,
                 entryPrice,
-                leverage: type === 'FUTURES' ? leverage : null,
-                marginMode: type === 'FUTURES' ? marginMode : null,
-                marginUsed: type === 'FUTURES' ? marginUsed : null,
-                status: 'OPEN',
+                stopLoss,
+                takeProfit: takeProfit,
+                quantity,
+                leverage,
+                marginUsed,
+                remarks,
+                exitPrice,
+                exitQuantity,
+                exitCondition,
+                exitDate,
+                status: exitPrice ? 'CLOSED' : 'OPEN',
+                netPnL: exitPrice ? (side === 'LONG' ? (exitPrice - entryPrice) * quantity : (entryPrice - exitPrice) * quantity) : null,
+                netPnLPercent: exitPrice ? (((side === 'LONG' ? (exitPrice - entryPrice) * quantity : (entryPrice - exitPrice) * quantity) / marginUsed) * 100) : null,
             },
         });
 
-        // 3. Update Account Balance (Deduct cost/margin)
-        // Note: strict separation. Spot deduction is permanent until sell. Futures margin is locked.
-        // For MVP, simply deducting 'currentBalance' to represent 'Free Margin/Available Balance'.
+        // 4. Handle Images
+        const files = formData.getAll('images') as File[];
+        for (const file of files) {
+            if (file.size > 0 && file.name) {
+                const buffer = Buffer.from(await file.arrayBuffer());
+                const fileName = `${Date.now()}-${file.name}`;
+                const filePath = path.join(process.cwd(), 'public/uploads', fileName);
+                await fs.writeFile(filePath, buffer);
 
-        const balanceChange = type === 'SPOT' ? cost : marginUsed;
+                await prisma.image.create({
+                    data: {
+                        url: `/uploads/${fileName}`,
+                        tradeId: trade.id
+                    }
+                });
+            }
+        }
+
+        // 5. Update Account Balance
+        // If OPEN: decrement marginUsed
+        // If CLOSED: adjustment = pnl; decrement -pnl (effectively increment pnl)
+        const pnl = trade.netPnL || 0;
+        const balanceChange = exitPrice ? -pnl : marginUsed;
 
         await prisma.account.update({
             where: { id: accountId },
             data: {
-                currentBalance: { decrement: balanceChange }
+                currentBalance: { decrement: balanceChange },
+                equity: { increment: exitPrice ? pnl : 0 }
             }
         });
 
+        revalidatePath(`/dashboard/accounts/${accountId}`);
+        return { success: true };
     } catch (error) {
         console.error('Create Trade Error:', error);
         return { error: 'Failed to log trade.' };
     }
-
-    revalidatePath(`/dashboard/accounts/${accountId}`);
-    return { success: true };
 }
-
 
 export async function createGridStrategy(
     accountId: string,
@@ -294,6 +350,8 @@ export async function createSpotHolding(
     const assetSymbol = formData.get('assetSymbol') as string;
     const quantity = parseFloat(formData.get('quantity') as string);
     const avgEntryPrice = parseFloat(formData.get('avgEntryPrice') as string);
+    const targetPrice = formData.get('targetPrice') ? parseFloat(formData.get('targetPrice') as string) : null;
+    const status = (formData.get('status') as string) || 'HODLING';
     const notes = formData.get('notes') as string || '';
 
     if (!assetSymbol || isNaN(quantity) || isNaN(avgEntryPrice)) {
@@ -313,6 +371,8 @@ export async function createSpotHolding(
                 assetSymbol: assetSymbol.toUpperCase(),
                 quantity,
                 avgEntryPrice,
+                targetPrice,
+                status,
                 notes,
             }
         });
@@ -390,9 +450,11 @@ export async function closeTrade(
     if (!session?.user?.id) return { error: 'Unauthorized' };
 
     const exitPrice = parseFloat(formData.get('exitPrice') as string);
+    const exitQuantity = parseFloat(formData.get('exitQuantity') as string);
+    const exitCondition = formData.get('exitCondition') as string;
 
-    if (isNaN(exitPrice)) {
-        return { error: 'Invalid exit price' };
+    if (isNaN(exitPrice) || isNaN(exitQuantity) || exitQuantity <= 0) {
+        return { error: 'Invalid exit price or quantity' };
     }
 
     try {
@@ -410,66 +472,109 @@ export async function closeTrade(
             return { error: 'Trade already closed' };
         }
 
-        // 2. Calculate PnL
-        let pnl = 0;
-        let revenue = 0; // For Spot
-        let marginToReturn = 0; // For Futures
-
-        if (trade.side === 'LONG') {
-            pnl = (exitPrice - trade.entryPrice) * trade.quantity;
-        } else {
-            pnl = (trade.entryPrice - exitPrice) * trade.quantity;
+        if (exitQuantity > trade.quantity) {
+            return { error: 'Exit quantity cannot exceed position size' };
         }
 
-        // 3. Update Balance
-        // Spot: Return Revenue (Cost + PnL)
-        // Futures: Return Margin + PnL
-        let balanceChange = 0;
-
-        if (trade.type === 'SPOT') {
-            // Revenue = Exit * Qty
-            // We originally deducted Cost = Entry * Qty
-            // So adding Revenue effectively adds Cost + PnL
-            balanceChange = exitPrice * trade.quantity;
-        } else {
-            // Futures
-            // We deducted Margin = (Entry * Qty) / Lev
-            // We return Margin + PnL
-            // Note: If PnL is negative, we return less than margin (or debt if liquidated, but simplified here)
-            marginToReturn = trade.marginUsed || 0;
-            balanceChange = marginToReturn + pnl;
+        if (exitCondition) {
+            await prisma.tradeCondition.upsert({
+                where: { name_type: { name: exitCondition, type: 'EXIT' } },
+                update: {},
+                create: { name: exitCondition, type: 'EXIT' },
+            });
         }
 
-        // 4. DB Updates
-        await prisma.$transaction([
-            prisma.trade.update({
-                where: { id: tradeId },
-                data: {
-                    exitPrice,
-                    closeTime: new Date(),
-                    netPnL: pnl,
-                    status: 'CLOSED'
-                }
-            }),
-            prisma.account.update({
-                where: { id: accountId },
-                data: {
-                    currentBalance: { increment: balanceChange },
-                    // Equity should technically be strictly updated, but our simplistic equity is balance + unrealized. 
-                    // When closed, it becomes balance. So incrementing balance updates equity implicitly if we recalc.
-                    // But here we store equity. Let's update equity by PnL.
-                    equity: { increment: pnl }
-                }
-            })
-        ]);
+        // 2. Calculations
+        const isPartial = exitQuantity < trade.quantity;
+        const unitPnL = trade.side === 'LONG' ? (exitPrice - trade.entryPrice) : (trade.entryPrice - exitPrice);
+        const pnl = unitPnL * exitQuantity;
 
+        const leverage = trade.leverage || 1;
+        const exitedMargin = (exitQuantity * trade.entryPrice) / leverage;
+        const balanceChange = exitedMargin + pnl;
+
+        if (isPartial) {
+            // Partial Close
+            await prisma.$transaction([
+                // Create a secondary CLOSED trade for history
+                prisma.trade.create({
+                    data: {
+                        accountId,
+                        type: trade.type,
+                        segment: trade.segment,
+                        symbol: trade.symbol,
+                        side: trade.side,
+                        marginMode: trade.marginMode,
+                        tradeType: trade.tradeType,
+                        session: trade.session,
+                        entryDate: trade.entryDate,
+                        analysisTimeframe: trade.analysisTimeframe,
+                        entryTimeframe: trade.entryTimeframe,
+                        entryCondition: trade.entryCondition,
+                        entryPrice: trade.entryPrice,
+                        stopLoss: trade.stopLoss,
+                        takeProfit: trade.takeProfit,
+                        quantity: exitQuantity,
+                        leverage: trade.leverage,
+                        marginUsed: exitedMargin,
+                        remarks: `Partial exit from trade ${trade.id}. ${trade.remarks || ''}`,
+                        exitPrice,
+                        exitQuantity,
+                        exitCondition,
+                        exitDate: new Date(),
+                        status: 'CLOSED',
+                        netPnL: pnl,
+                        netPnLPercent: (pnl / exitedMargin) * 100,
+                    }
+                }),
+                // Update original trade
+                prisma.trade.update({
+                    where: { id: tradeId },
+                    data: {
+                        quantity: { decrement: exitQuantity },
+                        marginUsed: { decrement: exitedMargin },
+                    }
+                }),
+                // Update account balance
+                prisma.account.update({
+                    where: { id: accountId },
+                    data: {
+                        currentBalance: { increment: balanceChange },
+                        equity: { increment: pnl }
+                    }
+                })
+            ]);
+        } else {
+            // Full Close
+            await prisma.$transaction([
+                prisma.trade.update({
+                    where: { id: tradeId },
+                    data: {
+                        exitPrice,
+                        exitQuantity,
+                        exitDate: new Date(),
+                        exitCondition,
+                        netPnL: pnl,
+                        netPnLPercent: (pnl / (trade.marginUsed || 1)) * 100,
+                        status: 'CLOSED'
+                    }
+                }),
+                prisma.account.update({
+                    where: { id: accountId },
+                    data: {
+                        currentBalance: { increment: balanceChange },
+                        equity: { increment: pnl }
+                    }
+                })
+            ]);
+        }
+
+        revalidatePath(`/dashboard/accounts/${accountId}`);
+        return { success: true };
     } catch (error) {
         console.error('Close Trade Error:', error);
         return { error: 'Failed to close trade' };
     }
-
-    revalidatePath(`/dashboard/accounts/${accountId}`);
-    return { success: true };
 }
 
 export async function closeGridStrategy(
@@ -519,6 +624,51 @@ export async function closeGridStrategy(
     } catch (error) {
         console.error('Close Grid Error:', error);
         return { error: 'Failed to close grid strategy' };
+    }
+
+    revalidatePath(`/dashboard/accounts/${accountId}`);
+    return { success: true };
+}
+
+export async function closeSpotHolding(
+    holdingId: string,
+    accountId: string,
+    prevState: any,
+    formData: FormData,
+) {
+    // Add logic to close a spot holding position
+    const session = await auth();
+    if (!session?.user?.id) return { error: 'Unauthorized' };
+
+    const exitPrice = parseFloat(formData.get('exitPrice') as string);
+    const status = formData.get('status') as string;
+
+    if (isNaN(exitPrice)) {
+        return { error: 'Invalid exit price' };
+    }
+
+    try {
+        const holding = await prisma.spotHolding.findUnique({
+            where: { id: holdingId },
+            include: { account: true }
+        });
+
+        if (!holding || holding.account.userId !== session.user.id) {
+            return { error: 'Unauthorized or holding not found' };
+        }
+
+        await prisma.spotHolding.update({
+            where: { id: holdingId },
+            data: {
+                status,
+                exitPrice,
+                updatedAt: new Date(),
+            }
+        });
+
+    } catch (error) {
+        console.error('Close Holding Error:', error);
+        return { error: 'Failed to close holding' };
     }
 
     revalidatePath(`/dashboard/accounts/${accountId}`);
