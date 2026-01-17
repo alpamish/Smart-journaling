@@ -59,6 +59,9 @@ export async function fetchTradesByAccountId(accountId: string): Promise<Trade[]
             where: {
                 accountId,
             },
+            include: {
+                images: true,
+            },
             orderBy: {
                 entryDate: 'desc',
             },

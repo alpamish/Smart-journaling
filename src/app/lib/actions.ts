@@ -167,8 +167,8 @@ export async function createTrade(
     // Exit Details (if closing while logging)
     const exitPrice = formData.get('exitPrice') ? parseFloat(formData.get('exitPrice') as string) : null;
     const exitQuantity = formData.get('exitQuantity') ? parseFloat(formData.get('exitQuantity') as string) : null;
-    const exitCondition = formData.get('exitCondition') as string;
-    const exitDate = exitPrice ? new Date() : null;
+    const exitCondition = formData.get('exitCondition')?.toString().trim() || '';
+    const exitDate = formData.get('exitDate') ? new Date(formData.get('exitDate') as string) : (exitPrice ? new Date() : null);
 
     if (!symbol || isNaN(quantity) || isNaN(entryPrice)) {
         return { error: 'Invalid input' };
@@ -187,20 +187,30 @@ export async function createTrade(
         }
 
         // Handle Trade Condition (Dynamic Insert)
-        if (entryCondition) {
-            await prisma.tradeCondition.upsert({
-                where: { name_type: { name: entryCondition, type: 'ENTRY' } },
-                update: {},
-                create: { name: entryCondition, type: 'ENTRY' },
+        if (entryCondition && entryCondition.trim()) {
+            const trimmedEntry = entryCondition.trim();
+            const existingEntryCondition = await prisma.tradeCondition.findUnique({
+                where: { name_type: { name: trimmedEntry, type: 'ENTRY' } }
             });
+
+            if (!existingEntryCondition) {
+                await prisma.tradeCondition.create({
+                    data: { name: trimmedEntry, type: 'ENTRY' },
+                });
+            }
         }
 
-        if (exitCondition) {
-            await prisma.tradeCondition.upsert({
-                where: { name_type: { name: exitCondition, type: 'EXIT' } },
-                update: {},
-                create: { name: exitCondition, type: 'EXIT' },
+        if (exitCondition && exitCondition.trim()) {
+            const trimmedExit = exitCondition.trim();
+            const existingExitCondition = await prisma.tradeCondition.findUnique({
+                where: { name_type: { name: trimmedExit, type: 'EXIT' } }
             });
+
+            if (!existingExitCondition) {
+                await prisma.tradeCondition.create({
+                    data: { name: trimmedExit, type: 'EXIT' },
+                });
+            }
         }
 
         const trade = await prisma.trade.create({
@@ -228,9 +238,9 @@ export async function createTrade(
                 exitQuantity,
                 exitCondition,
                 exitDate,
-                status: exitPrice ? 'CLOSED' : 'OPEN',
-                netPnL: exitPrice ? (side === 'LONG' ? (exitPrice - entryPrice) * quantity : (entryPrice - exitPrice) * quantity) : null,
-                netPnLPercent: exitPrice ? (((side === 'LONG' ? (exitPrice - entryPrice) * quantity : (entryPrice - exitPrice) * quantity) / marginUsed) * 100) : null,
+                status: (exitPrice && exitQuantity === quantity) ? 'CLOSED' : 'OPEN',
+                netPnL: exitPrice ? (side === 'LONG' ? (exitPrice - entryPrice) * (exitQuantity || quantity) : (entryPrice - exitPrice) * (exitQuantity || quantity)) : null,
+                netPnLPercent: exitPrice ? (((side === 'LONG' ? (exitPrice - entryPrice) * (exitQuantity || quantity) : (entryPrice - exitPrice) * (exitQuantity || quantity)) / marginUsed) * 100) : null,
             },
         });
 
@@ -451,7 +461,8 @@ export async function closeTrade(
 
     const exitPrice = parseFloat(formData.get('exitPrice') as string);
     const exitQuantity = parseFloat(formData.get('exitQuantity') as string);
-    const exitCondition = formData.get('exitCondition') as string;
+    const exitCondition = formData.get('exitCondition')?.toString().trim() || '';
+    const exitDate = formData.get('exitDate') ? new Date(formData.get('exitDate') as string) : new Date();
 
     if (isNaN(exitPrice) || isNaN(exitQuantity) || exitQuantity <= 0) {
         return { error: 'Invalid exit price or quantity' };
@@ -476,12 +487,17 @@ export async function closeTrade(
             return { error: 'Exit quantity cannot exceed position size' };
         }
 
-        if (exitCondition) {
-            await prisma.tradeCondition.upsert({
-                where: { name_type: { name: exitCondition, type: 'EXIT' } },
-                update: {},
-                create: { name: exitCondition, type: 'EXIT' },
+        if (exitCondition && exitCondition.trim()) {
+            const trimmedExit = exitCondition.trim();
+            const existingExitCondition = await prisma.tradeCondition.findUnique({
+                where: { name_type: { name: trimmedExit, type: 'EXIT' } }
             });
+
+            if (!existingExitCondition) {
+                await prisma.tradeCondition.create({
+                    data: { name: trimmedExit, type: 'EXIT' },
+                });
+            }
         }
 
         // 2. Calculations
@@ -521,7 +537,7 @@ export async function closeTrade(
                         exitPrice,
                         exitQuantity,
                         exitCondition,
-                        exitDate: new Date(),
+                        exitDate,
                         status: 'CLOSED',
                         netPnL: pnl,
                         netPnLPercent: (pnl / exitedMargin) * 100,
@@ -552,7 +568,7 @@ export async function closeTrade(
                     data: {
                         exitPrice,
                         exitQuantity,
-                        exitDate: new Date(),
+                        exitDate,
                         exitCondition,
                         netPnL: pnl,
                         netPnLPercent: (pnl / (trade.marginUsed || 1)) * 100,

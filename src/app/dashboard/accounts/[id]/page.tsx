@@ -9,12 +9,18 @@ import StatsCards from './analytics/stats-cards';
 import EquityChart from './analytics/equity-chart';
 import PnLChart from './analytics/pnl-chart';
 import CloseTradeButton from './close-trade-button';
+import TradeDetailButton from './trade-detail-button';
 import { fetchAnalyticsData } from '@/app/lib/data';
+import { Trade, Image as TradeImage } from '@prisma/client';
+
+interface TradeWithImages extends Trade {
+    images: TradeImage[];
+}
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const account = await fetchAccountById(id);
-    const trades = await fetchTradesByAccountId(id);
+    const trades = await fetchTradesByAccountId(id) as TradeWithImages[];
     const analytics = await fetchAnalyticsData(id);
 
     if (!account) {
@@ -165,7 +171,10 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
                                                             </span>
                                                         </td>
                                                         <td className="whitespace-nowrap px-6 py-4 text-right">
-                                                            <CloseTradeButton trade={trade} />
+                                                            <div className="flex justify-end gap-2">
+                                                                <TradeDetailButton trade={trade} />
+                                                                <CloseTradeButton trade={trade} />
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 ))}

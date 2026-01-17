@@ -81,9 +81,9 @@ export default async function GridList({ accountId }: { accountId: string }) {
                                     {/* <span className={`text-xl font-black tabular-nums ${grid.realizedPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                         {grid.realizedPnL >= 0 ? `+$${grid.realizedPnL}` : `-$${Math.abs(grid.realizedPnL)}`}
                                     </span> */}
-                                    <span className={`text-md font-black tabular-nums ${grid.gridProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    <span className={`text-md font-black tabular-nums ${(grid.gridProfit ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                         {grid.status === 'CLOSED' && (
-                                            grid.gridProfit >= 0 ? `+$${grid.gridProfit}` : `-$${Math.abs(grid.gridProfit)}`
+                                            (grid.gridProfit ?? 0) >= 0 ? `+$${grid.gridProfit ?? 0}` : `-$${Math.abs(grid.gridProfit ?? 0)}`
                                         )}
                                     </span>
                                     {grid.status === 'CLOSED' && (

@@ -3,6 +3,7 @@
 import { useActionState, useState, useEffect, useMemo } from 'react';
 import { createTrade, getTradeConditions } from '@/app/lib/actions';
 import { TradeCondition } from '@prisma/client';
+import './log-trade-form.css';
 
 export default function LogTradeForm({ accountId, close }: { accountId: string, close: () => void }) {
     const createTradeWithId = createTrade.bind(null, accountId);
@@ -12,16 +13,19 @@ export default function LogTradeForm({ accountId, close }: { accountId: string, 
     const [segment, setSegment] = useState('CRYPTO');
     const [quantity, setQuantity] = useState<number>(0);
     const [entryPrice, setEntryPrice] = useState<number>(0);
-    const [leverage, setLeverage] = useState<number>(1);
+    const [leverage, setLeverage] = useState<number>(3);
     const [exitPrice, setExitPrice] = useState<number>(0);
+    const [exitQuantity, setExitQuantity] = useState<number>(0);
+    const [exitQuantityPercent, setExitQuantityPercent] = useState<number>(0);
     const [side, setSide] = useState<'LONG' | 'SHORT'>('LONG');
 
     // Conditions State
     const [entryConditions, setEntryConditions] = useState<TradeCondition[]>([]);
     const [exitConditions, setExitConditions] = useState<TradeCondition[]>([]);
     const [imageCount, setImageCount] = useState(0);
-    const [customEntry, setCustomEntry] = useState('');
-    const [customExit, setCustomExit] = useState('');
+    const [imagePreviews, setImagePreviews] = useState<{ file: File, preview: string, progress: number }[]>([]);
+    const [isUploading, setIsUploading] = useState(false);
+    const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
 
     useEffect(() => {
         const fetchConditions = async () => {
@@ -36,8 +40,44 @@ export default function LogTradeForm({ accountId, close }: { accountId: string, 
     useEffect(() => {
         if (state?.success) {
             close();
+            // Reset form state after successful submission
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+            setImagePreviews([]);
+            setImageCount(0);
+            setIsUploading(false);
         }
     }, [state, close]);
+
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+
+        if (isPending) {
+            setIsUploading(true);
+            // Simulate upload progress
+            interval = setInterval(() => {
+                setImagePreviews(prev =>
+                    prev.map(preview => ({
+                        ...preview,
+                        progress: Math.min(preview.progress + Math.random() * 20, 90)
+                    }))
+                );
+            }, 200);
+        } else {
+            setIsUploading(false);
+            // Complete progress on success
+            if (imagePreviews.length > 0) {
+                setImagePreviews(prev =>
+                    prev.map(preview => ({ ...preview, progress: 100 }))
+                );
+            }
+        }
+
+        return () => {
+            if (interval) {
+                clearInterval(interval);
+            }
+        };
+    }, [isPending, imagePreviews.length]);
 
     // Auto-calculations
     const amountAfterLeverage = useMemo(() => quantity * entryPrice, [quantity, entryPrice]);
@@ -55,6 +95,78 @@ export default function LogTradeForm({ accountId, close }: { accountId: string, 
         return (pnl / marginUsed) * 100;
     }, [pnl, marginUsed]);
 
+    const exitQuantityPnL = useMemo(() => {
+        if (!exitPrice || !entryPrice || !exitQuantity) return 0;
+        return side === 'LONG'
+            ? (exitPrice - entryPrice) * exitQuantity
+            : (entryPrice - exitPrice) * exitQuantity;
+    }, [exitPrice, entryPrice, exitQuantity, side]);
+
+    const handleSliderChange = (percent: number) => {
+        setExitQuantityPercent(percent);
+        const calculatedQuantity = (quantity * percent) / 100;
+        setExitQuantity(calculatedQuantity);
+        const input = document.querySelector('input[name="exitQuantity"]') as HTMLInputElement;
+        if (input) {
+            input.value = calculatedQuantity.toString();
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    };
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []);
+
+        // Limit to 3 images total (including already selected)
+        const totalImages = imagePreviews.length + files.length;
+        const filesToProcess = totalImages > 3
+            ? files.slice(0, 3 - imagePreviews.length)
+            : files;
+
+        if (totalImages > 3) {
+            alert('You can only upload up to 3 images.');
+        }
+
+        const validFiles = filesToProcess.filter(file => {
+            const isValidType = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'].includes(file.type);
+            const isValidSize = file.size <= 10 * 1024 * 1024; // 10MB
+            return isValidType && isValidSize;
+        });
+
+        const previews = await Promise.all(validFiles.map(async (file) => {
+            return new Promise<{ file: File, preview: string, progress: number }>((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    resolve({
+                        file,
+                        preview: e.target?.result as string,
+                        progress: 0
+                    });
+                };
+                reader.readAsDataURL(file);
+            });
+        }));
+
+        setImagePreviews(prev => [...prev, ...previews]);
+    };
+
+    const removeImage = (index: number) => {
+        setImagePreviews(prev => prev.filter((_, i) => i !== index));
+    };
+
+    async function handleSubmit(formData: FormData) {
+        // Clear any existing images from the native form submission to avoid duplicates
+        // Note: FormData.delete isn't always available in all environments, 
+        // but it's safe in modern browsers.
+        formData.delete('images');
+
+        // Append all files from imagePreviews state
+        imagePreviews.forEach(preview => {
+            formData.append('images', preview.file);
+        });
+
+        formAction(formData);
+    }
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
             <div className="w-full max-w-4xl rounded-2xl bg-white dark:bg-slate-900 p-8 shadow-2xl max-h-[95vh] overflow-y-auto border border-slate-200 dark:border-slate-800">
@@ -68,7 +180,7 @@ export default function LogTradeForm({ accountId, close }: { accountId: string, 
                     </button>
                 </div>
 
-                <form action={formAction} className="space-y-8">
+                <form action={handleSubmit} className="space-y-8">
                     {/* Setup Section */}
                     <section>
                         <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4 pb-2 border-b border-slate-100 dark:border-slate-800">1. Trade Setup</h3>
@@ -128,7 +240,7 @@ export default function LogTradeForm({ accountId, close }: { accountId: string, 
                                     <select
                                         name="side"
                                         value={side}
-                                        onChange={(e) => setSide(e.target.value as any)}
+                                        onChange={(e) => setSide(e.target.value as 'LONG' | 'SHORT')}
                                         className={`w-full rounded-lg border-slate-200 dark:border-slate-700 dark:bg-slate-800 p-2.5 focus:ring-2 focus:ring-blue-500 transition-all font-bold ${side === 'LONG' ? 'text-emerald-600' : 'text-rose-600'}`}
                                     >
                                         <option value="LONG">LONG</option>
@@ -168,18 +280,19 @@ export default function LogTradeForm({ accountId, close }: { accountId: string, 
                         </div>
                         <div className="mt-4">
                             <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Entry Condition</label>
-                            <div className="relative">
-                                <input
-                                    list="entry-conditions"
-                                    name="entryCondition"
-                                    placeholder="Select or type new condition..."
-                                    className="w-full rounded-lg border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 focus:ring-2 focus:ring-blue-500 transition-all"
-                                />
-                                <datalist id="entry-conditions">
-                                    {entryConditions.map(c => <option key={c.id} value={c.name} />)}
-                                    {['Accurate Entry', 'Early Entry', 'FOMO', 'Trendline Breakout'].map(ex => <option key={ex} value={ex} />)}
-                                </datalist>
-                            </div>
+                            <select
+                                name="entryCondition"
+                                className="w-full rounded-lg border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 focus:ring-2 focus:ring-blue-500 transition-all"
+                            >
+                                <option value="">Select condition...</option>
+                                {entryConditions.map(c => (
+                                    <option key={c.id} value={c.name}>{c.name}</option>
+                                ))}
+                                <option value="Accurate Entry">Accurate Entry</option>
+                                <option value="Early Entry">Early Entry</option>
+                                <option value="FOMO">FOMO</option>
+                                <option value="Trendline Breakout">Trendline Breakout</option>
+                            </select>
                         </div>
                     </section>
 
@@ -189,11 +302,11 @@ export default function LogTradeForm({ accountId, close }: { accountId: string, 
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Stop Loss</label>
-                                <input type="number" name="stopLoss" step="any" className="w-full rounded-lg border-rose-100 dark:border-rose-900/30 dark:bg-rose-900/10 text-rose-600 p-2.5 focus:ring-2 focus:ring-rose-500 transition-all" />
+                                <input type="number" name="stopLoss" step="any" className="w-full rounded-lg border-rose-100 dark:border-rose-900/30 dark:bg-rose-900/20 text-rose-600 p-2.5 focus:ring-2 focus:ring-rose-500 transition-all" />
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Target (TP)</label>
-                                <input type="number" name="takeProfit" step="any" className="w-full rounded-lg border-emerald-100 dark:border-emerald-900/30 dark:bg-emerald-900/10 text-emerald-600 p-2.5 focus:ring-2 focus:ring-emerald-500 transition-all" />
+                                <input type="number" name="takeProfit" step="any" className="w-full rounded-lg border-emerald-100 dark:border-emerald-900/30 dark:bg-emerald-900/20 text-emerald-600 p-2.5 focus:ring-2 focus:ring-emerald-500 transition-all" />
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Quantity (Size)</label>
@@ -212,8 +325,8 @@ export default function LogTradeForm({ accountId, close }: { accountId: string, 
                                     type="number"
                                     name="leverage"
                                     min="1"
-                                    defaultValue="1"
-                                    onChange={(e) => setLeverage(parseFloat(e.target.value) || 1)}
+                                    defaultValue="3"
+                                    onChange={(e) => setLeverage(parseFloat(e.target.value) || 3)}
                                     className="w-full rounded-lg border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 focus:ring-2 focus:ring-blue-500 transition-all"
                                 />
                             </div>
@@ -253,20 +366,70 @@ export default function LogTradeForm({ accountId, close }: { accountId: string, 
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Exit Quantity</label>
-                                <input type="number" name="exitQuantity" step="any" className="w-full rounded-lg border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 focus:ring-2 focus:ring-blue-500 transition-all" />
+                                <input
+                                    type="number"
+                                    name="exitQuantity"
+                                    step="any"
+                                    value={exitQuantity}
+                                    onChange={(e) => {
+                                        const val = parseFloat(e.target.value) || 0;
+                                        setExitQuantity(val);
+                                        if (quantity > 0) {
+                                            setExitQuantityPercent((val / quantity) * 100);
+                                        }
+                                    }}
+                                    className="w-full rounded-lg border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 focus:ring-2 focus:ring-blue-500 transition-all"
+                                />
+                                {quantity > 0 && (
+                                    <div className="mt-3 space-y-2">
+                                        <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                                            <span>0%</span>
+                                            <span className="font-bold text-blue-600 dark:text-blue-400">{exitQuantityPercent.toFixed(0)}%</span>
+                                            <span>100%</span>
+                                        </div>
+                                        <div className="relative">
+                                            <input
+                                                type="range"
+                                                min="0"
+                                                max="100"
+                                                value={exitQuantityPercent}
+                                                onChange={(e) => handleSliderChange(parseFloat(e.target.value))}
+                                                className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer slider"
+                                                style={{
+                                                    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${exitQuantityPercent}%, #e2e8f0 ${exitQuantityPercent}%, #e2e8f0 100%)`
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="flex justify-between text-xs text-slate-400">
+                                            <span>{exitQuantity.toFixed(4)} units</span>
+                                            <span>of {quantity.toFixed(4)} total</span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Exit Condition</label>
-                                <input
-                                    list="exit-conditions"
+                                <select
                                     name="exitCondition"
-                                    placeholder="Select or type..."
+                                    className="w-full rounded-lg border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 focus:ring-2 focus:ring-blue-500 transition-all"
+                                >
+                                    <option value="">Select condition...</option>
+                                    {exitConditions.map(c => (
+                                        <option key={c.id} value={c.name}>{c.name}</option>
+                                    ))}
+                                    {!exitConditions.some(c => c.name === 'Target Hit') && <option value="Target Hit">Target Hit</option>}
+                                    {!exitConditions.some(c => c.name === 'Stop Loss Hit') && <option value="Stop Loss Hit">Stop Loss Hit</option>}
+                                    {!exitConditions.some(c => c.name === 'Manual Exit') && <option value="Manual Exit">Manual Exit</option>}
+                                    {!exitConditions.some(c => c.name === 'Trailing Stop') && <option value="Trailing Stop">Trailing Stop</option>}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Exit Date / Time</label>
+                                <input
+                                    type="datetime-local"
+                                    name="exitDate"
                                     className="w-full rounded-lg border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 focus:ring-2 focus:ring-blue-500 transition-all"
                                 />
-                                <datalist id="exit-conditions">
-                                    {exitConditions.map(c => <option key={c.id} value={c.name} />)}
-                                    {['Target Hit', 'Stop Loss Hit', 'Manual Exit', 'Trailing Stop'].map(ex => <option key={ex} value={ex} />)}
-                                </datalist>
                             </div>
                         </div>
                     </section>
@@ -288,6 +451,21 @@ export default function LogTradeForm({ accountId, close }: { accountId: string, 
                                             {pnl >= 0 ? '▲' : '▼'} {Math.abs(pnlPercent).toFixed(2)}%
                                         </div>
                                     </div>
+                                    {exitQuantity > 0 && exitPrice > 0 && (
+                                        <div className={`mt-4 pt-4 border-t ${exitQuantityPnL >= 0 ? 'border-emerald-200 dark:border-emerald-800' : 'border-rose-200 dark:border-rose-800'}`}>
+                                            <div className="flex justify-between items-center">
+                                                <div>
+                                                    <span className={`text-xs font-bold uppercase ${exitQuantityPnL >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>PnL for {exitQuantityPercent.toFixed(0)}% Exit</span>
+                                                    <div className={`text-xl font-mono font-bold mt-1 ${exitQuantityPnL >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'}`}>
+                                                        {exitQuantityPnL >= 0 ? '+' : ''}{exitQuantityPnL.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                    </div>
+                                                </div>
+                                                <div className={`text-sm font-bold ${exitQuantityPnL >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                    {exitQuantityPercent.toFixed(0)}% of position
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Remarks / Trade Notes</label>
@@ -297,6 +475,58 @@ export default function LogTradeForm({ accountId, close }: { accountId: string, 
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Chart Images</label>
+
+                                    {/* Image Previews */}
+                                    {imagePreviews.length > 0 && (
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                                            {imagePreviews.map((preview, index) => (
+                                                <div key={index} className="relative group">
+                                                    <div
+                                                        className="aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 cursor-pointer hover:shadow-lg transition-shadow"
+                                                        onClick={() => setSelectedImageIndex(index)}
+                                                    >
+                                                        <img
+                                                            src={preview.preview}
+                                                            alt={`Preview ${index + 1}`}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                        {preview.progress > 0 && preview.progress < 100 && (
+                                                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                                                <div className="text-white text-sm font-bold">
+                                                                    {preview.progress}%
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        {preview.progress === 100 && (
+                                                            <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <div className="text-white text-sm font-bold">
+                                                                    Click to view
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            removeImage(index);
+                                                        }}
+                                                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                                                    >
+                                                        ×
+                                                    </button>
+                                                    <div className="mt-1 text-xs text-slate-500 dark:text-slate-400 truncate">
+                                                        {preview.file.name}
+                                                    </div>
+                                                    <div className="text-xs text-slate-400">
+                                                        {(preview.file.size / 1024 / 1024).toFixed(2)} MB
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Upload Area */}
                                     <div
                                         onClick={() => document.getElementById('image-upload')?.click()}
                                         className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-300 dark:border-slate-700 border-dashed rounded-lg hover:border-blue-400 transition-colors cursor-pointer group"
@@ -307,10 +537,10 @@ export default function LogTradeForm({ accountId, close }: { accountId: string, 
                                             </svg>
                                             <div className="flex text-sm text-slate-600 dark:text-slate-400">
                                                 <span className="relative rounded-md font-medium text-blue-600 hover:text-blue-500">
-                                                    {imageCount > 0 ? `${imageCount} images selected` : 'Upload multiple images'}
+                                                    {imagePreviews.length > 0 ? `${imagePreviews.length} images selected (max 3)` : 'Upload images (max 3)'}
                                                 </span>
                                             </div>
-                                            <p className="text-xs text-slate-500">PNG, JPG up to 10MB</p>
+                                            <p className="text-xs text-slate-500">PNG, JPG, GIF up to 10MB each</p>
                                         </div>
                                     </div>
                                     <input
@@ -318,9 +548,25 @@ export default function LogTradeForm({ accountId, close }: { accountId: string, 
                                         id="image-upload"
                                         multiple
                                         name="images"
+                                        accept="image/*"
                                         className="hidden"
-                                        onChange={(e) => setImageCount(e.target.files?.length || 0)}
+                                        onChange={handleImageUpload}
                                     />
+
+                                    {/* Upload Progress */}
+                                    {isUploading && (
+                                        <div className="mt-4 space-y-2">
+                                            <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                                Uploading Images...
+                                            </div>
+                                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                                                <div
+                                                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                                    style={{ width: '0%' }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -350,6 +596,75 @@ export default function LogTradeForm({ accountId, close }: { accountId: string, 
                     {state?.error && <p className="mt-2 text-center text-rose-500 text-sm font-medium bg-rose-50 dark:bg-rose-900/10 p-3 rounded-lg border border-rose-100 dark:border-rose-900/30">{state.error}</p>}
                 </form>
             </div>
+
+            {/* Image Viewer Modal */}
+            {selectedImageIndex !== null && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <div className="relative max-w-4xl max-h-[90vh] w-full">
+                        <div className="relative bg-white dark:bg-slate-900 rounded-2xl overflow-hidden">
+                            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                                        {imagePreviews[selectedImageIndex].file.name}
+                                    </h3>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                                        {(imagePreviews[selectedImageIndex].file.size / 1024 / 1024).toFixed(2)} MB
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setSelectedImageIndex(null)}
+                                    className="rounded-full p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                >
+                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div className="relative">
+                                <img
+                                    src={imagePreviews[selectedImageIndex].preview}
+                                    alt={imagePreviews[selectedImageIndex].file.name}
+                                    className="w-full max-h-[70vh] object-contain"
+                                />
+                                {/* Navigation arrows */}
+                                {imagePreviews.length > 1 && (
+                                    <>
+                                        <button
+                                            onClick={() => setSelectedImageIndex(selectedImageIndex > 0 ? selectedImageIndex - 1 : imagePreviews.length - 1)}
+                                            className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/50 text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-colors"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                            </svg>
+                                        </button>
+                                        <button
+                                            onClick={() => setSelectedImageIndex(selectedImageIndex < imagePreviews.length - 1 ? selectedImageIndex + 1 : 0)}
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/50 text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-colors"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                            <div className="p-4 border-t border-slate-200 dark:border-slate-700">
+                                <div className="flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
+                                    <span>{selectedImageIndex + 1} of {imagePreviews.length}</span>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => removeImage(selectedImageIndex)}
+                                            className="px-3 py-1 bg-red-500 text-white text-xs rounded-lg hover:bg-red-600 transition-colors"
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
