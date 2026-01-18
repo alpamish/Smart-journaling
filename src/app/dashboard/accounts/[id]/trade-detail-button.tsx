@@ -5,11 +5,18 @@ import { Trade, Image as TradeImage } from '@prisma/client';
 import TradeDetailModal from './trade-detail-modal';
 import { Info } from 'lucide-react';
 
-interface TradeWithImages extends Trade {
+type TradeWithImages = Trade & {
     images: TradeImage[];
-}
+    parentId?: string | null;
+};
 
-export default function TradeDetailButton({ trade }: { trade: TradeWithImages }) {
+export default function TradeDetailButton({
+    trade,
+    children = []
+}: {
+    trade: TradeWithImages,
+    children?: Trade[]
+}) {
     const [isOpen, setIsOpen] = useState(false);
 
     return (
@@ -24,7 +31,7 @@ export default function TradeDetailButton({ trade }: { trade: TradeWithImages })
             </button>
 
             {isOpen && (
-                <TradeDetailModal trade={trade} onClose={() => setIsOpen(false)} />
+                <TradeDetailModal trade={trade} children={children} onClose={() => setIsOpen(false)} />
             )}
         </>
     );

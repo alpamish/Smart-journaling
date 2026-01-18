@@ -8,8 +8,8 @@ import HoldingsList from './holdings/holdings-list';
 import StatsCards from './analytics/stats-cards';
 import EquityChart from './analytics/equity-chart';
 import PnLChart from './analytics/pnl-chart';
-import CloseTradeButton from './close-trade-button';
 import TradeDetailButton from './trade-detail-button';
+import TradesTable from './trades-table';
 import { fetchAnalyticsData } from '@/app/lib/data';
 import { Trade, Image as TradeImage } from '@prisma/client';
 
@@ -119,69 +119,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
                             </div>
 
                             <div className="premium-card overflow-hidden !p-0">
-                                {trades.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground">
-                                        <div className="mb-4 rounded-full bg-muted p-4">
-                                            <svg className="h-8 w-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                            </svg>
-                                        </div>
-                                        <p className="text-lg font-medium text-foreground">No trades logged yet</p>
-                                        <p className="text-sm">Start your journaling journey today.</p>
-                                    </div>
-                                ) : (
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full border-collapse text-left text-sm">
-                                            <thead className="bg-muted/50 border-b border-border">
-                                                <tr>
-                                                    <th className="px-6 py-4 font-semibold text-foreground">Date</th>
-                                                    <th className="px-6 py-4 font-semibold text-foreground">Symbol</th>
-                                                    <th className="px-6 py-4 font-semibold text-foreground">Side</th>
-                                                    <th className="px-6 py-4 font-semibold text-foreground text-right">Entry</th>
-                                                    <th className="px-6 py-4 font-semibold text-foreground text-right">PnL</th>
-                                                    <th className="px-6 py-4 font-semibold text-foreground">Status</th>
-                                                    <th className="px-6 py-4 font-semibold text-foreground text-right">Action</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-border bg-card">
-                                                {trades.map((trade) => (
-                                                    <tr key={trade.id} className="group transition-colors hover:bg-muted/30">
-                                                        <td className="whitespace-nowrap px-6 py-4 text-muted-foreground">
-                                                            {new Date(trade.entryDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                                        </td>
-                                                        <td className="whitespace-nowrap px-6 py-4 font-bold text-foreground">
-                                                            {trade.symbol}
-                                                        </td>
-                                                        <td className="whitespace-nowrap px-6 py-4">
-                                                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset ${trade.side === 'LONG' ? 'bg-green-500/10 text-green-600 ring-green-600/20 dark:text-green-400' : 'bg-red-500/10 text-red-600 ring-red-600/20 dark:text-red-400'
-                                                                }`}>
-                                                                {trade.side}
-                                                            </span>
-                                                        </td>
-                                                        <td className="whitespace-nowrap px-6 py-4 text-right tabular-nums text-muted-foreground">
-                                                            ${trade.entryPrice.toLocaleString()}
-                                                        </td>
-                                                        <td className={`whitespace-nowrap px-6 py-4 text-right font-bold tabular-nums ${(trade.netPnL || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                                                            }`}>
-                                                            {trade.netPnL ? (trade.netPnL >= 0 ? `+$${trade.netPnL.toLocaleString()}` : `-$${Math.abs(trade.netPnL).toLocaleString()}`) : '-'}
-                                                        </td>
-                                                        <td className="whitespace-nowrap px-6 py-4">
-                                                            <span className={`px-2 py-1 rounded text-xs font-medium ${trade.status === 'OPEN' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}>
-                                                                {trade.status}
-                                                            </span>
-                                                        </td>
-                                                        <td className="whitespace-nowrap px-6 py-4 text-right">
-                                                            <div className="flex justify-end gap-2">
-                                                                <TradeDetailButton trade={trade} />
-                                                                <CloseTradeButton trade={trade} />
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
+                                <TradesTable trades={trades} />
                             </div>
                         </section>
                     </div>
