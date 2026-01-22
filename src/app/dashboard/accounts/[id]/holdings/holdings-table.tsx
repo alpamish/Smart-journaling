@@ -6,16 +6,7 @@ import DeleteButton from '@/app/dashboard/components/delete-button';
 import { deleteSpotHolding } from '@/app/lib/actions';
 import CloseHoldingForm from './close-holding-form';
 
-interface Holding {
-    id: string;
-    assetSymbol: string;
-    quantity: number;
-    avgEntryPrice: number;
-    targetPrice: number | null;
-    exitPrice: number | null;
-    status: string;
-    notes: string | null;
-}
+import { Holding } from '@/app/lib/types';
 
 interface GroupedHolding {
     symbol: string;
@@ -195,6 +186,7 @@ export default function HoldingsTable({
                                                 <th className="px-6 py-2 text-[9px] uppercase tracking-widest text-muted-foreground font-bold">Transaction Ledger</th>
                                                 <th className="px-6 py-2 text-[9px] uppercase tracking-widest text-muted-foreground font-bold">Qty</th>
                                                 <th className="px-6 py-2 text-[9px] uppercase tracking-widest text-muted-foreground font-bold">Entry Price</th>
+                                                <th className="px-6 py-2 text-[9px] uppercase tracking-widest text-muted-foreground font-bold">Exit Price</th>
                                                 <th className="px-6 py-2 text-[9px] uppercase tracking-widest text-muted-foreground font-bold text-right">Value / PnL</th>
                                                 <th className="px-6 py-2 text-[9px] uppercase tracking-widest text-muted-foreground font-bold text-right text-foreground">Operations</th>
                                             </tr>
@@ -218,6 +210,9 @@ export default function HoldingsTable({
                                                     </td>
                                                     <td className="px-6 py-3 text-xs tabular-nums text-muted-foreground font-medium">
                                                         ${tx.avgEntryPrice.toLocaleString()}
+                                                    </td>
+                                                    <td className="px-6 py-3 text-xs tabular-nums text-muted-foreground font-medium">
+                                                        {tx.exitPrice ? `$${tx.exitPrice.toLocaleString()}` : '-'}
                                                     </td>
                                                     <td className="px-6 py-3 text-right text-xs tabular-nums font-bold">
                                                         <div className="flex flex-col items-end">
@@ -263,6 +258,7 @@ export default function HoldingsTable({
                     holdingId={closingHolding.id}
                     accountId={accountId}
                     assetSymbol={closingHolding.assetSymbol}
+                    maxQuantity={closingHolding.quantity}
                     close={() => setClosingHolding(null)}
                 />
             )}

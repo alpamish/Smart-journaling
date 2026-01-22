@@ -158,14 +158,52 @@ export async function fetchAnalyticsData(accountId: string) {
             });
         });
 
+        // 3. Calculate Monthly Return (Last 30 days)
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const lastMonthTrades = trades.filter(t => t.exitDate && new Date(t.exitDate) >= thirtyDaysAgo);
+        const lastMonthPnL = lastMonthTrades.reduce((sum, t) => sum + (t.netPnL || 0), 0);
+        const previousBalance = runningBalance - lastMonthPnL;
+        const monthlyReturn = previousBalance > 0 ? (lastMonthPnL / previousBalance) * 100 : 0;
+
+        // 4. Count Total Trades
+        const totalTradesCount = await prisma.trade.count({
+            where: {
+                accountId
+            }
+        });
+
+        // 5. Calculate Holdings Stats
+        const activeHoldings = await prisma.spotHolding.findMany({
+            where: {
+                accountId,
+                status: { not: 'SOLD' }
+            }
+        });
+
+        const totalHoldingsValue = activeHoldings.reduce((sum, h) => sum + (h.quantity * h.avgEntryPrice), 0);
+        const portfolioCount = new Set(activeHoldings.map(h => h.assetSymbol)).size;
+
+        // Calculate 24h change based on trades closed in the last 24 hours
+        const twentyFourHoursAgo = new Date();
+        twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+        const lastDayTrades = trades.filter(t => t.exitDate && new Date(t.exitDate) >= twentyFourHoursAgo);
+        const dailyChange = lastDayTrades.reduce((sum, t) => sum + (t.netPnL || 0), 0);
+
         return {
             stats: {
-                totalTrades,
+                totalTrades: totalTradesCount,
+                totalTradesCount,
                 winRate: winRate.toFixed(1),
                 profitFactor: profitFactor.toFixed(2),
                 totalPnL: totalPnL.toFixed(2),
                 avgWin: avgWin.toFixed(2),
-                avgLoss: avgLoss.toFixed(2)
+                avgLoss: avgLoss.toFixed(2),
+                monthlyReturn: monthlyReturn.toFixed(1),
+                totalHoldings: totalHoldingsValue.toFixed(2),
+                portfolioCount: portfolioCount,
+                dailyChange: dailyChange.toFixed(2)
             },
             equityCurve
         };

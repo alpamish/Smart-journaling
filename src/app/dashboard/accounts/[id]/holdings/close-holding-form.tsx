@@ -8,11 +8,13 @@ export default function CloseHoldingForm({
     holdingId,
     accountId,
     assetSymbol,
+    maxQuantity,
     close
 }: {
     holdingId: string,
     accountId: string,
     assetSymbol: string,
+    maxQuantity: number,
     close: () => void
 }) {
     const closeHoldingWithId = closeSpotHolding.bind(null, holdingId, accountId);
@@ -48,6 +50,25 @@ export default function CloseHoldingForm({
                 </div>
 
                 <form action={formAction} className="p-6 space-y-6">
+                    {/* Exit Quantity */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold flex items-center gap-2 text-foreground/80">
+                            <TrendingUp className="h-4 w-4 text-primary/60" />
+                            Exit Quantity (Max: {maxQuantity})
+                        </label>
+                        <input
+                            type="number"
+                            name="exitQuantity"
+                            step="any"
+                            required
+                            defaultValue={maxQuantity}
+                            max={maxQuantity}
+                            min={0.00000001}
+                            placeholder="0.00"
+                            className="h-11 w-full rounded-xl border border-input bg-background/50 px-4 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium"
+                        />
+                    </div>
+
                     {/* Exit Price */}
                     <div className="space-y-2">
                         <label className="text-sm font-semibold flex items-center gap-2 text-foreground/80">

@@ -5,7 +5,7 @@ import { createTrade, getTradeConditions } from '@/app/lib/actions';
 import { TradeCondition } from '@prisma/client';
 import './log-trade-form.css';
 
-export default function LogTradeForm({ accountId, close }: { accountId: string, close: () => void }) {
+export default function LogTradeForm({ accountId, balance, close }: { accountId: string, balance: number, close: () => void }) {
     const createTradeWithId = createTrade.bind(null, accountId);
     const [state, formAction, isPending] = useActionState(createTradeWithId, null);
 
@@ -26,6 +26,32 @@ export default function LogTradeForm({ accountId, close }: { accountId: string, 
     const [imagePreviews, setImagePreviews] = useState<{ file: File, preview: string, progress: number }[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+
+    const TIMEFRAMES = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '8h', '12h', '1d', '3d', '1w', '1M'];
+    const DEFAULT_CONDITIONS = {
+        ENTRY: [
+            'Accurate Entry', 'Early Entry', 'FOMO', 'Trendline Breakout', 'Double Bottom',
+            'Double Top', 'EMA Cross', 'RSI Divergence', 'Support Bounce', 'Resistance Breakout',
+            'Golden Cross', 'Death Cross', 'Trendline Reject', 'Oversold RSI', 'Overbought RSI',
+            'Patience rewarded', 'Chased entry', 'News event', 'Rule based', 'Impulse trade'
+        ],
+        EXIT: [
+            // Standard Hits
+            'Target Hit', 'Stop Loss Hit', 'Manual Exit', 'Trailing Stop',
+            // Technical Reasons
+            'Trend Reversal', 'Resistance Reject', 'Support Break', 'Exhaustion Candle',
+            'Double Top Confirm', 'Double Bottom Confirm', 'Divergence Confirmation',
+            'Indicator Overlap', 'Squeeze Play Over', 'Volume Climax', 'Invalid Setup',
+            'Lower High formed', 'Higher Low broken', 'EMA 200 Reject', 'VWAP Reject',
+            'Parabolic Blowoff', 'Mean Reversion', 'Liquidity Sweep',
+            // Time & Strategy
+            'Time Based Exit', 'End of Session', 'Risk Reduction', 'Scaling Out',
+            'Fundamental Shift', 'Economic Data Release', 'Profit Protecting',
+            // Psychological
+            'Emotional Exit', 'Fear based', 'Greed based', 'Lost Confidence',
+            'Impatience', 'Distraction', 'Second Guessing'
+        ]
+    };
 
     useEffect(() => {
         const fetchConditions = async () => {
@@ -94,6 +120,24 @@ export default function LogTradeForm({ accountId, close }: { accountId: string, 
         if (!pnl || !marginUsed) return 0;
         return (pnl / marginUsed) * 100;
     }, [pnl, marginUsed]);
+
+    const liquidationPrice = useMemo(() => {
+        if (!entryPrice || !leverage || leverage <= 0) return 0;
+        // maintenance margin rate (0.1% to allow higher leverage without immediately liquidating)
+        const mm = 0.001;
+
+        if (side === 'LONG') {
+            // LiqPrice = EntryPrice * (1 - 1/leverage + mm)
+            let lp = entryPrice * (1 - (1 / leverage) + mm);
+            return Math.max(0, lp);
+        } else {
+            // LiqPrice = EntryPrice * (1 + 1/leverage - mm)
+            let lp = entryPrice * (1 + (1 / leverage) - mm);
+            return Math.max(0, lp);
+        }
+    }, [entryPrice, leverage, side]);
+
+    const isOverMargin = marginUsed > balance;
 
     const exitQuantityPnL = useMemo(() => {
         if (!exitPrice || !entryPrice || !exitQuantity) return 0;
@@ -266,14 +310,14 @@ export default function LogTradeForm({ accountId, close }: { accountId: string, 
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Analysis Timeframe</label>
-                                    <select name="analysisTimeframe" className="w-full rounded-lg border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 focus:ring-2 focus:ring-blue-500 transition-all">
-                                        {['1m', '5m', '15m', '1h', '4h', '1d', '1w'].map(tf => <option key={tf} value={tf}>{tf}</option>)}
+                                    <select name="analysisTimeframe" className="w-full rounded-lg border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 focus:ring-2 focus:ring-blue-500 transition-all text-sm">
+                                        {TIMEFRAMES.map(tf => <option key={tf} value={tf}>{tf}</option>)}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Entry Timeframe</label>
-                                    <select name="entryTimeframe" className="w-full rounded-lg border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 focus:ring-2 focus:ring-blue-500 transition-all">
-                                        {['1m', '5m', '15m', '1h', '4h', '1d', '1w'].map(tf => <option key={tf} value={tf}>{tf}</option>)}
+                                    <select name="entryTimeframe" className="w-full rounded-lg border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 focus:ring-2 focus:ring-blue-500 transition-all text-sm">
+                                        {TIMEFRAMES.map(tf => <option key={tf} value={tf}>{tf}</option>)}
                                     </select>
                                 </div>
                             </div>
@@ -288,10 +332,9 @@ export default function LogTradeForm({ accountId, close }: { accountId: string, 
                                 {entryConditions.map(c => (
                                     <option key={c.id} value={c.name}>{c.name}</option>
                                 ))}
-                                <option value="Accurate Entry">Accurate Entry</option>
-                                <option value="Early Entry">Early Entry</option>
-                                <option value="FOMO">FOMO</option>
-                                <option value="Trendline Breakout">Trendline Breakout</option>
+                                {DEFAULT_CONDITIONS.ENTRY.filter(name => !entryConditions.some(c => c.name === name)).map(name => (
+                                    <option key={name} value={name}>{name}</option>
+                                ))}
                             </select>
                         </div>
                     </section>
@@ -338,10 +381,22 @@ export default function LogTradeForm({ accountId, close }: { accountId: string, 
                                     {amountAfterLeverage.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-sm font-normal text-slate-400">USD</span>
                                 </div>
                             </div>
-                            <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30">
-                                <span className="text-xs font-bold text-blue-500 dark:text-blue-400 uppercase">Margin Required</span>
-                                <div className="text-xl font-mono font-bold text-blue-600 dark:text-blue-400 mt-1">
-                                    {marginUsed.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-sm font-normal text-blue-400">USD</span>
+                            <div className={`p-4 rounded-xl border transition-colors ${isOverMargin
+                                ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-900/50'
+                                : 'bg-blue-50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-900/30'}`}>
+                                <span className={`text-xs font-bold uppercase ${isOverMargin ? 'text-rose-500' : 'text-blue-500 dark:text-blue-400'}`}>Margin Required</span>
+                                <div className={`text-xl font-mono font-bold mt-1 ${isOverMargin ? 'text-rose-600' : 'text-blue-600 dark:text-blue-400'}`}>
+                                    {marginUsed.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-sm font-normal opacity-70">USD</span>
+                                </div>
+                                {isOverMargin && (
+                                    <p className="text-[10px] font-bold text-rose-500 mt-1 uppercase tracking-tight animate-pulse">Insufficient Balance</p>
+                                )}
+                            </div>
+                            <div className="p-4 rounded-xl bg-orange-50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30">
+                                <span className="text-xs font-bold text-orange-500 dark:text-orange-400 uppercase">Est. Liquidation Price</span>
+                                <input type="hidden" name="liquidationPrice" value={liquidationPrice} />
+                                <div className="text-xl font-mono font-bold text-orange-600 dark:text-orange-400 mt-1">
+                                    ${liquidationPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </div>
                             </div>
                         </div>
@@ -417,10 +472,9 @@ export default function LogTradeForm({ accountId, close }: { accountId: string, 
                                     {exitConditions.map(c => (
                                         <option key={c.id} value={c.name}>{c.name}</option>
                                     ))}
-                                    {!exitConditions.some(c => c.name === 'Target Hit') && <option value="Target Hit">Target Hit</option>}
-                                    {!exitConditions.some(c => c.name === 'Stop Loss Hit') && <option value="Stop Loss Hit">Stop Loss Hit</option>}
-                                    {!exitConditions.some(c => c.name === 'Manual Exit') && <option value="Manual Exit">Manual Exit</option>}
-                                    {!exitConditions.some(c => c.name === 'Trailing Stop') && <option value="Trailing Stop">Trailing Stop</option>}
+                                    {DEFAULT_CONDITIONS.EXIT.filter(name => !exitConditions.some(c => c.name === name)).map(name => (
+                                        <option key={name} value={name}>{name}</option>
+                                    ))}
                                 </select>
                             </div>
                             <div>
@@ -451,6 +505,16 @@ export default function LogTradeForm({ accountId, close }: { accountId: string, 
                                             {pnl >= 0 ? '▲' : '▼'} {Math.abs(pnlPercent).toFixed(2)}%
                                         </div>
                                     </div>
+                                    {entryPrice > 0 && exitPrice > 0 && (
+                                        <div className="mt-2 text-[10px] font-mono opacity-50 flex gap-2">
+                                            <span>Formula:</span>
+                                            <span>
+                                                {side === 'LONG'
+                                                    ? `(${exitPrice} - ${entryPrice}) × ${exitQuantity || quantity}`
+                                                    : `(${entryPrice} - ${exitPrice}) × ${exitQuantity || quantity}`}
+                                            </span>
+                                        </div>
+                                    )}
                                     {exitQuantity > 0 && exitPrice > 0 && (
                                         <div className={`mt-4 pt-4 border-t ${exitQuantityPnL >= 0 ? 'border-emerald-200 dark:border-emerald-800' : 'border-rose-200 dark:border-rose-800'}`}>
                                             <div className="flex justify-between items-center">

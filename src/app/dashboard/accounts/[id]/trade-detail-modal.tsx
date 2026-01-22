@@ -33,8 +33,8 @@ export default function TradeDetailModal({
 
     // Combined Exit Calculations
     const allExits = [
-        ...children.map(c => ({ qty: c.exitQuantity || 0, price: c.exitPrice || 0 })),
-        ...(trade.status === 'CLOSED' ? [{ qty: trade.exitQuantity || 0, price: trade.exitPrice || 0 }] : [])
+        ...children.map(c => ({ qty: c.exitQuantity || 0, price: c.exitPrice || 0, pnl: c.netPnL || 0 })),
+        ...(trade.status === 'CLOSED' ? [{ qty: trade.exitQuantity || 0, price: trade.exitPrice || 0, pnl: trade.netPnL || 0 }] : [])
     ];
     const totalExitedQty = allExits.reduce((sum, e) => sum + e.qty, 0);
     const weightedAvgExitPrice = totalExitedQty > 0
@@ -280,6 +280,9 @@ export default function TradeDetailModal({
                                                                 <span className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">{exit.qty.toLocaleString()}</span>
                                                                 <div className="w-8 h-[1px] bg-slate-200 dark:bg-slate-700 my-1"></div>
                                                                 <span className="text-[10px] text-slate-500 font-mono font-bold">${exit.price.toLocaleString()}</span>
+                                                                <span className={`text-[10px] font-bold mt-1 ${exit.pnl >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                                                    {exit.pnl >= 0 ? '+' : ''}${Math.abs(exit.pnl).toLocaleString()}
+                                                                </span>
                                                             </div>
                                                             {i < allExits.length - 1 && <span className="text-slate-300 font-bold text-lg">+</span>}
                                                         </div>
@@ -336,6 +339,12 @@ export default function TradeDetailModal({
                                     <span className="text-[10px] text-slate-500 uppercase font-bold">Timeframe (Entry)</span>
                                     <p className="text-sm font-bold text-slate-700 dark:text-slate-300">{trade.entryTimeframe || 'N/A'}</p>
                                 </div>
+                                {trade.liquidationPrice && (
+                                    <div className="md:col-span-1">
+                                        <span className="text-[10px] text-orange-500 uppercase font-bold">Liq. Price</span>
+                                        <p className="text-sm font-mono font-bold text-orange-600 dark:text-orange-400">${trade.liquidationPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
 

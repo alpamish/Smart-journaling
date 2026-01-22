@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import LogTradeForm from './log-trade-form';
 
-export default function LogTradeButton({ accountId }: { accountId: string }) {
+export default function LogTradeButton({ accountId, balance }: { accountId: string, balance: number }) {
     const [isOpen, setIsOpen] = useState(false);
 
     return (
@@ -17,7 +17,7 @@ export default function LogTradeButton({ accountId }: { accountId: string }) {
                 </svg>
                 Log Trade
             </button>
-            {isOpen && <LogTradeForm accountId={accountId} close={() => setIsOpen(false)} />}
+            {isOpen && <LogTradeForm accountId={accountId} balance={balance} close={() => setIsOpen(false)} />}
         </>
     );
 }

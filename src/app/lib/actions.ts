@@ -108,6 +108,16 @@ export async function createAccount(
     }
 
     try {
+        // Double check if user exists to avoid foreign key violation
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id }
+        });
+
+        if (!user) {
+            console.error('Session user not found in database:', session.user.id);
+            return 'Your session is invalid. Please log out and log in again.';
+        }
+
         await prisma.account.create({
             data: {
                 userId: session.user.id,
@@ -162,6 +172,7 @@ export async function createTrade(
     const quantity = parseFloat(formData.get('quantity') as string);
     const entryPrice = parseFloat(formData.get('entryPrice') as string);
     const leverage = parseFloat(formData.get('leverage') as string) || 1;
+    const liquidationPrice = formData.get('liquidationPrice') ? parseFloat(formData.get('liquidationPrice') as string) : null;
     const remarks = formData.get('remarks') as string;
 
     // Exit Details (if closing while logging)
@@ -238,6 +249,7 @@ export async function createTrade(
                 exitQuantity,
                 exitCondition,
                 exitDate,
+                liquidationPrice,
                 status: (exitPrice && exitQuantity === quantity) ? 'CLOSED' : 'OPEN',
                 netPnL: exitPrice ? (side === 'LONG' ? (exitPrice - entryPrice) * (exitQuantity || quantity) : (entryPrice - exitPrice) * (exitQuantity || quantity)) : null,
                 netPnLPercent: exitPrice ? (((side === 'LONG' ? (exitPrice - entryPrice) * (exitQuantity || quantity) : (entryPrice - exitPrice) * (exitQuantity || quantity)) / marginUsed) * 100) : null,
@@ -303,6 +315,8 @@ export async function createGridStrategy(
     const liquidationPrice = parseFloat(formData.get('liquidationPrice') as string);
     const investmentAfterLeverage = parseFloat(formData.get('investmentAfterLeverage') as string);
     const entryPrice = parseFloat(formData.get('entryPrice') as string);
+    const maintenanceMargin = formData.get('maintenanceMargin') ? parseFloat(formData.get('maintenanceMargin') as string) : null;
+    const maintenanceMarginRate = formData.get('maintenanceMarginRate') ? parseFloat(formData.get('maintenanceMarginRate') as string) : null;
 
     if (!symbol || isNaN(lowerPrice) || isNaN(upperPrice) || isNaN(gridCount) || isNaN(allocatedCapital)) {
         return { error: 'Invalid input parameters' };
@@ -331,11 +345,13 @@ export async function createGridStrategy(
                 upperPrice,
                 gridCount,
                 allocatedCapital,
-                leverage: leverage || 1, // Default 1 for spot
+                leverage: leverage || 1,
                 direction,
                 liquidationPrice: isNaN(liquidationPrice) ? null : liquidationPrice,
                 investmentAfterLeverage: isNaN(investmentAfterLeverage) ? null : investmentAfterLeverage,
                 entryPrice: isNaN(entryPrice) ? null : entryPrice,
+                maintenanceMargin: maintenanceMargin,
+                maintenanceMarginRate: maintenanceMarginRate,
                 status: 'ACTIVE',
             }
         });
@@ -653,16 +669,15 @@ export async function closeSpotHolding(
     prevState: any,
     formData: FormData,
 ) {
-    // Add logic to close a spot holding position
     const session = await auth();
     if (!session?.user?.id) return { error: 'Unauthorized' };
 
     const exitPrice = parseFloat(formData.get('exitPrice') as string);
+    const exitQuantity = parseFloat(formData.get('exitQuantity') as string);
     const status = formData.get('status') as string;
 
-    if (isNaN(exitPrice)) {
-        return { error: 'Invalid exit price' };
-    }
+    if (isNaN(exitPrice)) return { error: 'Invalid exit price' };
+    if (isNaN(exitQuantity) || exitQuantity <= 0) return { error: 'Invalid exit quantity' };
 
     try {
         const holding = await prisma.spotHolding.findUnique({
@@ -674,14 +689,45 @@ export async function closeSpotHolding(
             return { error: 'Unauthorized or holding not found' };
         }
 
-        await prisma.spotHolding.update({
-            where: { id: holdingId },
-            data: {
-                status,
-                exitPrice,
-                updatedAt: new Date(),
-            }
-        });
+        if (exitQuantity > holding.quantity) {
+            return { error: `Exit quantity (${exitQuantity}) cannot exceed holding quantity (${holding.quantity})` };
+        }
+
+        if (exitQuantity === holding.quantity) {
+            // Full Close
+            await prisma.spotHolding.update({
+                where: { id: holdingId },
+                data: {
+                    status,
+                    exitPrice,
+                    updatedAt: new Date(),
+                }
+            });
+        } else {
+            // Partial Close
+            // 1. Create a new record for the SOLD portion
+            await prisma.spotHolding.create({
+                data: {
+                    accountId,
+                    assetSymbol: holding.assetSymbol,
+                    quantity: exitQuantity,
+                    avgEntryPrice: holding.avgEntryPrice,
+                    targetPrice: holding.targetPrice,
+                    exitPrice: exitPrice,
+                    status: status,
+                    notes: `Partial exit from ledger #${holding.id.slice(-6)}`,
+                }
+            });
+
+            // 2. Update the original record to subtract the exited quantity
+            await prisma.spotHolding.update({
+                where: { id: holdingId },
+                data: {
+                    quantity: holding.quantity - exitQuantity,
+                    updatedAt: new Date(),
+                }
+            });
+        }
 
     } catch (error) {
         console.error('Close Holding Error:', error);

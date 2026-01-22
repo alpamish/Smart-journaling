@@ -1,10 +1,10 @@
-import { fetchSpotHoldings } from '@/app/lib/data';
+'use client';
+
+import { Holding } from '@/app/lib/types';
 import { Coins } from 'lucide-react';
 import HoldingsTable from './holdings-table';
 
-export default async function HoldingsList({ accountId }: { accountId: string }) {
-    const holdings = await fetchSpotHoldings(accountId);
-
+export default function HoldingsList({ accountId, holdings }: { accountId: string, holdings: Holding[] }) {
     if (holdings.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 p-12 text-center shadow-sm">

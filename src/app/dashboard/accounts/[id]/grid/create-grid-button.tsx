@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import CreateGridForm from './create-grid-form';
+import { Account } from '@prisma/client';
 
-export default function CreateGridButton({ accountId }: { accountId: string }) {
+export default function CreateGridButton({ accountId, account }: { accountId: string, account: Account }) {
     const [isOpen, setIsOpen] = useState(false);
 
     return (
@@ -17,7 +18,7 @@ export default function CreateGridButton({ accountId }: { accountId: string }) {
                 </svg>
                 New Strategy
             </button>
-            {isOpen && <CreateGridForm accountId={accountId} close={() => setIsOpen(false)} />}
+            {isOpen && <CreateGridForm accountId={accountId} balance={account.currentBalance} close={() => setIsOpen(false)} />}
         </>
     );
 }
