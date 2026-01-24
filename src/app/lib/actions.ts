@@ -336,25 +336,33 @@ export async function createGridStrategy(
         // For simplicity, we just create the strategy record. 
         // In a real app, successful creation might trigger an order placement engine.
 
-        await prisma.gridStrategy.create({
-            data: {
-                accountId,
-                type,
-                symbol: symbol.toUpperCase(),
-                lowerPrice,
-                upperPrice,
-                gridCount,
-                allocatedCapital,
-                leverage: leverage || 1,
-                direction,
-                liquidationPrice: isNaN(liquidationPrice) ? null : liquidationPrice,
-                investmentAfterLeverage: isNaN(investmentAfterLeverage) ? null : investmentAfterLeverage,
-                entryPrice: isNaN(entryPrice) ? null : entryPrice,
-                maintenanceMargin: maintenanceMargin,
-                maintenanceMarginRate: maintenanceMarginRate,
-                status: 'ACTIVE',
-            }
-        });
+        await prisma.$transaction([
+            prisma.gridStrategy.create({
+                data: {
+                    accountId,
+                    type,
+                    symbol: symbol.toUpperCase(),
+                    lowerPrice,
+                    upperPrice,
+                    gridCount,
+                    allocatedCapital,
+                    leverage: leverage || 1,
+                    direction,
+                    liquidationPrice: isNaN(liquidationPrice) ? null : liquidationPrice,
+                    investmentAfterLeverage: isNaN(investmentAfterLeverage) ? null : investmentAfterLeverage,
+                    entryPrice: isNaN(entryPrice) ? null : entryPrice,
+                    maintenanceMargin: maintenanceMargin,
+                    maintenanceMarginRate: maintenanceMarginRate,
+                    status: 'ACTIVE',
+                }
+            }),
+            prisma.account.update({
+                where: { id: accountId },
+                data: {
+                    currentBalance: { decrement: allocatedCapital }
+                }
+            })
+        ]);
 
     } catch (error) {
         console.error('Create Grid Error:', error);
@@ -391,17 +399,27 @@ export async function createSpotHolding(
 
         if (!account) return { error: 'Account not found' };
 
-        await prisma.spotHolding.create({
-            data: {
-                accountId,
-                assetSymbol: assetSymbol.toUpperCase(),
-                quantity,
-                avgEntryPrice,
-                targetPrice,
-                status,
-                notes,
-            }
-        });
+        const cost = quantity * avgEntryPrice;
+
+        await prisma.$transaction([
+            prisma.spotHolding.create({
+                data: {
+                    accountId,
+                    assetSymbol: assetSymbol.toUpperCase(),
+                    quantity,
+                    avgEntryPrice,
+                    targetPrice,
+                    status,
+                    notes,
+                }
+            }),
+            prisma.account.update({
+                where: { id: accountId },
+                data: {
+                    currentBalance: { decrement: cost }
+                }
+            })
+        ]);
 
     } catch (error) {
         console.error('Create Holding Error:', error);
@@ -642,17 +660,29 @@ export async function closeGridStrategy(
             return { error: 'Strategy already closed' };
         }
 
-        await prisma.gridStrategy.update({
-            where: { id: strategyId },
-            data: {
-                status: 'CLOSED',
-                exitPrice,
-                gridProfit: isNaN(gridProfit) ? 0 : gridProfit,
-                totalProfit: isNaN(totalProfit) ? 0 : totalProfit,
-                closeNote,
-                updatedAt: new Date(),
-            }
-        });
+        const pnl = isNaN(totalProfit) ? 0 : totalProfit;
+        const returnCapital = strategy.allocatedCapital + pnl;
+
+        await prisma.$transaction([
+            prisma.gridStrategy.update({
+                where: { id: strategyId },
+                data: {
+                    status: 'CLOSED',
+                    exitPrice,
+                    gridProfit: isNaN(gridProfit) ? 0 : gridProfit,
+                    totalProfit: pnl,
+                    closeNote,
+                    updatedAt: new Date(),
+                }
+            }),
+            prisma.account.update({
+                where: { id: accountId },
+                data: {
+                    currentBalance: { increment: returnCapital },
+                    equity: { increment: pnl }
+                }
+            })
+        ]);
 
     } catch (error) {
         console.error('Close Grid Error:', error);
@@ -693,40 +723,58 @@ export async function closeSpotHolding(
             return { error: `Exit quantity (${exitQuantity}) cannot exceed holding quantity (${holding.quantity})` };
         }
 
+        const pnl = (exitPrice - holding.avgEntryPrice) * exitQuantity;
+        const returnAmount = (holding.avgEntryPrice * exitQuantity) + pnl;
+
         if (exitQuantity === holding.quantity) {
             // Full Close
-            await prisma.spotHolding.update({
-                where: { id: holdingId },
-                data: {
-                    status,
-                    exitPrice,
-                    updatedAt: new Date(),
-                }
-            });
+            await prisma.$transaction([
+                prisma.spotHolding.update({
+                    where: { id: holdingId },
+                    data: {
+                        status,
+                        exitPrice,
+                        updatedAt: new Date(),
+                    }
+                }),
+                prisma.account.update({
+                    where: { id: accountId },
+                    data: {
+                        currentBalance: { increment: returnAmount },
+                        equity: { increment: pnl }
+                    }
+                })
+            ]);
         } else {
             // Partial Close
-            // 1. Create a new record for the SOLD portion
-            await prisma.spotHolding.create({
-                data: {
-                    accountId,
-                    assetSymbol: holding.assetSymbol,
-                    quantity: exitQuantity,
-                    avgEntryPrice: holding.avgEntryPrice,
-                    targetPrice: holding.targetPrice,
-                    exitPrice: exitPrice,
-                    status: status,
-                    notes: `Partial exit from ledger #${holding.id.slice(-6)}`,
-                }
-            });
-
-            // 2. Update the original record to subtract the exited quantity
-            await prisma.spotHolding.update({
-                where: { id: holdingId },
-                data: {
-                    quantity: holding.quantity - exitQuantity,
-                    updatedAt: new Date(),
-                }
-            });
+            await prisma.$transaction([
+                prisma.spotHolding.create({
+                    data: {
+                        accountId,
+                        assetSymbol: holding.assetSymbol,
+                        quantity: exitQuantity,
+                        avgEntryPrice: holding.avgEntryPrice,
+                        targetPrice: holding.targetPrice,
+                        exitPrice: exitPrice,
+                        status: status,
+                        notes: `Partial exit from ledger #${holding.id.slice(-6)}`,
+                    }
+                }),
+                prisma.spotHolding.update({
+                    where: { id: holdingId },
+                    data: {
+                        quantity: holding.quantity - exitQuantity,
+                        updatedAt: new Date(),
+                    }
+                }),
+                prisma.account.update({
+                    where: { id: accountId },
+                    data: {
+                        currentBalance: { increment: returnAmount },
+                        equity: { increment: pnl }
+                    }
+                })
+            ]);
         }
 
     } catch (error) {

@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { X } from 'lucide-react';
+import { X, Home } from 'lucide-react';
+import Link from 'next/link';
 import { ViewType, menuItems } from './glass-sidebar';
 
 interface MobileSidebarProps {
@@ -19,7 +20,7 @@ export default function MobileSidebar({ accountId, currentView, onViewChange, is
         <div className="fixed inset-0 z-50 lg:hidden">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
             <div className="absolute inset-y-0 left-0 w-80 overflow-y-auto glass-sidebar bg-background/95 border-r border-white/10">
-                <div className="p-6 border-b border-white/10">
+                <div className="p-6 border-b border-white/10 space-y-6">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
@@ -38,6 +39,16 @@ export default function MobileSidebar({ accountId, currentView, onViewChange, is
                             <X className="h-5 w-5 text-muted-foreground" />
                         </button>
                     </div>
+
+                    <Link
+                        href="/dashboard"
+                        className="flex items-center gap-3 w-full p-3 rounded-xl border border-white/10 glass-card hover:bg-white/10 transition-all duration-300 group"
+                    >
+                        <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center group-hover:bg-blue-500/20 group-hover:text-blue-400 transition-all">
+                            <Home className="h-5 w-5" />
+                        </div>
+                        <span className="font-medium text-muted-foreground group-hover:text-foreground">Exit Account</span>
+                    </Link>
                 </div>
 
                 <nav className="p-6 space-y-3">

@@ -15,9 +15,11 @@ export default function GridDetailModal({
     const isActive = grid.status === 'ACTIVE';
     const isFutures = grid.type === 'FUTURES';
 
-    const gridSpacing = grid.upperPrice > grid.lowerPrice
-        ? ((grid.upperPrice - grid.lowerPrice) / grid.gridCount).toFixed(2)
-        : '0';
+    const stepValue = grid.upperPrice > grid.lowerPrice
+        ? (grid.upperPrice - grid.lowerPrice) / grid.gridCount
+        : 0;
+
+    const gridSpacing = stepValue < 0.1 ? stepValue.toFixed(4) : stepValue.toFixed(2);
 
     const investmentAfterLeverage = grid.investmentAfterLeverage ?? (isFutures ? grid.allocatedCapital * (grid.leverage || 1) : grid.allocatedCapital);
 
@@ -134,6 +136,9 @@ export default function GridDetailModal({
                                     <div>
                                         <span className="text-[10px] text-slate-500 uppercase font-bold">Grid Spacing</span>
                                         <p className="text-lg font-mono font-bold text-slate-900 dark:text-white">${gridSpacing}</p>
+                                        <p className="text-[10px] text-slate-400 mt-1">
+                                            Yield: {((stepValue / grid.upperPrice) * 100).toFixed(2)}% - {((stepValue / grid.lowerPrice) * 100).toFixed(2)}%
+                                        </p>
                                     </div>
                                     <div>
                                         <span className="text-[10px] text-slate-500 uppercase font-bold">Number of Grids</span>

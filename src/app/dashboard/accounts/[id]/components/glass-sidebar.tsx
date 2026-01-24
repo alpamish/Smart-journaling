@@ -10,8 +10,10 @@ import {
     Target,
     Activity,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Home
 } from 'lucide-react';
+import Link from 'next/link';
 
 export type ViewType = 'grid' | 'holdings' | 'journal' | 'analytics';
 
@@ -87,7 +89,7 @@ export default function GlassSidebar({
         `}>
 
             <div className="h-full flex flex-col">
-                <div className="p-4 border-b border-white/10">
+                <div className="p-4 border-b border-white/10 space-y-4">
                     <div className="flex items-center justify-between">
                         {!isCollapsed && (
                             <div className="flex items-center gap-3">
@@ -112,6 +114,18 @@ export default function GlassSidebar({
                             )}
                         </button>
                     </div>
+
+                    {!isCollapsed && (
+                        <Link
+                            href="/dashboard"
+                            className="flex items-center gap-3 w-full p-2.5 rounded-xl border border-white/10 glass-card hover:bg-white/10 transition-all duration-300 group"
+                        >
+                            <div className="h-9 w-9 rounded-lg bg-muted/50 flex items-center justify-center group-hover:bg-blue-500/20 group-hover:text-blue-400 transition-all">
+                                <Home className="h-4 w-4" />
+                            </div>
+                            <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground">Exit Account</span>
+                        </Link>
+                    )}
                 </div>
 
                 <nav className="flex-1 p-4 space-y-2 overflow-y-auto">

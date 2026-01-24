@@ -33,7 +33,7 @@ export default function OptimizedTradesTable({ trades, itemsPerPage = 25 }: Opti
 
         // Apply search filter
         if (searchTerm) {
-            filtered = filtered.filter(trade => 
+            filtered = filtered.filter(trade =>
                 trade.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 trade.side.toLowerCase().includes(searchTerm.toLowerCase())
             );
@@ -132,23 +132,23 @@ export default function OptimizedTradesTable({ trades, itemsPerPage = 25 }: Opti
     return (
         <div className="space-y-4">
             {/* Search and Filter Controls */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="relative flex-1 max-w-md">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mt-2 px-4">
+                <div className="relative flex-1 max-w-md ">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <input
                         type="text"
                         placeholder="Search trades..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                        className="w-full pl-10 pr-4 py-2 bg-background rounded-md focus:outline-none focus:border-primary transition-colors"
                     />
                 </div>
-                
+
                 <div className="flex gap-2">
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="px-3 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                        className="px-3 py-2 bg-background rounded-md focus:outline-none focus:border-primary transition-colors"
                     >
                         <option value="all">All Status</option>
                         <option value="OPEN">Open</option>
@@ -158,7 +158,7 @@ export default function OptimizedTradesTable({ trades, itemsPerPage = 25 }: Opti
             </div>
 
             {/* Results count */}
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm text-muted-foreground px-6">
                 Showing {paginatedTrades.length} of {parentTrades.length} trades
             </div>
 
@@ -221,6 +221,10 @@ export default function OptimizedTradesTable({ trades, itemsPerPage = 25 }: Opti
                                 const hasChildren = children.length > 0;
                                 const isExpanded = expandedTrades.has(trade.id);
 
+                                // Calculate unified stats for the parent row (Parent + Children)
+                                const totalQuantity = trade.quantity + children.reduce((sum, c) => sum + (c.exitQuantity || 0), 0);
+                                const aggregatePnL = (trade.netPnL || 0) + children.reduce((sum, c) => sum + (c.netPnL || 0), 0);
+
                                 return (
                                     <React.Fragment key={trade.id}>
                                         <tr className="group transition-colors hover:bg-muted/30">
@@ -241,7 +245,7 @@ export default function OptimizedTradesTable({ trades, itemsPerPage = 25 }: Opti
                                                 {trade.symbol}
                                             </td>
                                             <td className="whitespace-nowrap px-6 py-4 text-right tabular-nums text-muted-foreground text-xs uppercase">
-                                                {trade.quantity.toLocaleString()} Units
+                                                {totalQuantity.toLocaleString()} Units
                                             </td>
                                             <td className="whitespace-nowrap px-6 py-4">
                                                 <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset ${trade.side === 'LONG' ? 'bg-green-500/10 text-green-600 ring-green-600/20 dark:text-green-400' : 'bg-red-500/10 text-red-600 ring-red-600/20 dark:text-red-400'
@@ -252,9 +256,9 @@ export default function OptimizedTradesTable({ trades, itemsPerPage = 25 }: Opti
                                             <td className="whitespace-nowrap px-6 py-4 text-right tabular-nums text-muted-foreground">
                                                 ${trade.entryPrice.toLocaleString()}
                                             </td>
-                                            <td className={`whitespace-nowrap px-6 py-4 text-right font-bold tabular-nums ${(trade.netPnL || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                                            <td className={`whitespace-nowrap px-6 py-4 text-right font-bold tabular-nums ${aggregatePnL >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                                                 }`}>
-                                                {trade.netPnL ? (trade.netPnL >= 0 ? `+$${trade.netPnL.toLocaleString()}` : `-$${Math.abs(trade.netPnL).toLocaleString()}`) : '-'}
+                                                {aggregatePnL >= 0 ? `+$${aggregatePnL.toLocaleString()}` : `-$${Math.abs(aggregatePnL).toLocaleString()}`}
                                             </td>
                                             <td className="whitespace-nowrap px-6 py-4">
                                                 <span className={`px-2 py-1 rounded text-xs font-medium ${trade.status === 'OPEN' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}>

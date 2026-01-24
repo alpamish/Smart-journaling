@@ -48,9 +48,8 @@ export function calculateFuturesGrid(inputs: GridInputs): GridResults {
 
     const warnings: string[] = [];
 
-    // 0. Base Calculations
-    // Entry price (default = geometric mean for more accurate liquidation calculation)
-    const entryPrice = providedEntryPrice || Math.sqrt(lowerPrice * upperPrice);
+    // Entry price (default = arithmetic mean for standard balanced calculation)
+    const entryPrice = providedEntryPrice || (lowerPrice + upperPrice) / 2;
     // Grid step = (upper_price - lower_price) / grid_count
     const gridStep = (upperPrice - lowerPrice) / gridCount;
 

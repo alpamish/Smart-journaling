@@ -6,10 +6,9 @@ import GridList from './grid/grid-list';
 import CreateGridButton from './grid/create-grid-button';
 import AddHoldingButton from './holdings/add-holding-button';
 import HoldingsList from './holdings/holdings-list';
-import StatsCards from './analytics/stats-cards';
-import EquityChart from './analytics/equity-chart';
-import PnLChart from './analytics/pnl-chart';
-import TradesTable from './trades-table';
+import OptimizedStatsCards from './analytics/optimized-stats-cards';
+import OptimizedChart from './analytics/optimized-chart';
+import OptimizedTradesTable from './optimized-trades-table';
 import GlassSidebar, { ViewType } from './components/glass-sidebar';
 import MobileSidebar from './components/mobile-sidebar';
 import { Menu } from 'lucide-react';
@@ -26,12 +25,17 @@ interface AccountDashboardProps {
 }
 
 export default function AccountDashboard({ accountId, account, trades, analytics, strategies, holdings }: AccountDashboardProps) {
-    const [currentView, setCurrentView] = useState<ViewType>('grid');
+    const [currentView, setCurrentView] = useState<ViewType>('analytics');
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
     // Calculate total grid profit from strategies
-    const totalGridProfit = strategies.reduce((sum, s) => sum + (s.totalProfit || 0), 0);
+    const totalGridProfit = strategies.reduce((sum, s) => sum + (Number(s.totalProfit) || 0), 0);
     const totalGridStrategies = strategies.length;
+
+    // Calculate realized holding PnL
+    const totalRealizedHoldingPnL = holdings
+        .filter(h => h.status === 'SOLD' && h.exitPrice)
+        .reduce((sum, h) => sum + ((Number(h.exitPrice) - Number(h.avgEntryPrice)) * Number(h.quantity)), 0);
 
     return (
         <div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -174,8 +178,8 @@ export default function AccountDashboard({ accountId, account, trades, analytics
                                                     </div>
                                                     <div>
                                                         <p className="text-sm text-muted-foreground">24h Change</p>
-                                                        <p className={`text-2xl font-bold ${Number(analytics.stats?.dailyChange || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                                            {Number(analytics.stats?.dailyChange || 0) >= 0 ? '+' : '-'}${Math.abs(Number(analytics.stats?.dailyChange || 0)).toFixed(2)}
+                                                        <p className={`text-2xl font-bold ${Number(analytics.stats?.dailySpotChange || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                                            {Number(analytics.stats?.dailySpotChange || 0) >= 0 ? '+' : '-'}${Math.abs(Number(analytics.stats?.dailySpotChange || 0)).toFixed(2)}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -227,7 +231,7 @@ export default function AccountDashboard({ accountId, account, trades, analytics
                                                     </div>
                                                     <div>
                                                         <p className="text-sm text-muted-foreground">Total Trades</p>
-                                                        <p className="text-2xl font-bold text-foreground">{String(analytics.stats?.totalTrades || 0)}</p>
+                                                        <p className="text-2xl font-bold text-foreground">{String(analytics.stats?.total_parent_trade || 0)}</p>
                                                     </div>
                                                 </div>
                                             </div>
@@ -238,8 +242,8 @@ export default function AccountDashboard({ accountId, account, trades, analytics
                                                     </div>
                                                     <div>
                                                         <p className="text-sm text-muted-foreground">Net P&L</p>
-                                                        <p className={`text-2xl font-bold ${(analytics.stats?.netPnL && Number(analytics.stats.netPnL) >= 0) ? 'text-green-500' : 'text-red-500'}`}>
-                                                            ${analytics.stats?.netPnL ? Number(analytics.stats.netPnL).toFixed(2) : '0.00'}
+                                                        <p className={`text-2xl font-bold ${(analytics.stats?.totalTradePnL && Number(analytics.stats.totalTradePnL) >= 0) ? 'text-green-500' : 'text-red-500'}`}>
+                                                            ${analytics.stats?.totalTradePnL ? Number(analytics.stats.totalTradePnL).toFixed(2) : '0.00'}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -266,7 +270,7 @@ export default function AccountDashboard({ accountId, account, trades, analytics
                                             <p className="text-sm text-muted-foreground mt-1">Detailed log of all your trades</p>
                                         </div>
                                         <div className="overflow-hidden">
-                                            <TradesTable trades={trades} />
+                                            <OptimizedTradesTable trades={trades} />
                                         </div>
                                     </div>
                                 </div>
@@ -274,18 +278,64 @@ export default function AccountDashboard({ accountId, account, trades, analytics
 
                             {currentView === 'analytics' && analytics && (
                                 <div className="space-y-8 animate-fade-in">
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
                                         <div>
                                             <h1 className="text-3xl font-bold tracking-tight text-foreground">Performance Analytics</h1>
                                             <p className="text-muted-foreground mt-1">Comprehensive metrics and charts for your trading performance</p>
                                         </div>
+                                        <div className="flex gap-6 items-center px-4 py-3 bg-muted/40 rounded-2xl border border-border/50">
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Initial Balance</span>
+                                                <span className="text-lg font-bold text-foreground">${account.initialBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                            <div className="h-8 w-px bg-border/50" />
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total Balance</span>
+                                                <span className="text-xl font-bold text-foreground">${account.currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                        </div>
                                     </div>
 
-                                    <StatsCards stats={analytics.stats} />
-
                                     <div className="grid gap-6 md:grid-cols-2">
-                                        <EquityChart data={analytics.equityCurve || []} />
-                                        <PnLChart data={analytics.equityCurve || []} />
+                                        <div className="stat-card">
+                                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Strategies P&L</p>
+                                            <p className={`text-3xl font-bold tracking-tight mt-2 ${Number(analytics.stats?.totalGridPnL || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                                {Number(analytics.stats?.totalGridPnL || 0) >= 0 ? '+' : '-'}${Math.abs(Number(analytics.stats?.totalGridPnL || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                            </p>
+                                        </div>
+                                        <div className="stat-card">
+                                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Holding PNL</p>
+                                            <p className={`text-3xl font-bold tracking-tight mt-2 ${Number(analytics.stats?.totalHoldingPnL || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                                {Number(analytics.stats?.totalHoldingPnL || 0) >= 0 ? '+' : '-'}${Math.abs(Number(analytics.stats?.totalHoldingPnL || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="border-t border-border/50 pt-8 mt-4">
+                                        <h2 className="text-lg font-bold text-foreground mb-4">Trade Journal Metrics</h2>
+                                        <OptimizedStatsCards stats={analytics.stats as any} />
+                                    </div>
+
+                                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                                        <OptimizedChart
+                                            data={(analytics.equityCurve || []).map(item => ({
+                                                date: item.date,
+                                                value: item.balance
+                                            }))}
+                                            type="equity"
+                                        />
+                                        <OptimizedChart
+                                            data={(analytics.equityCurve || []).map(item => ({
+                                                date: item.date,
+                                                value: item.pnl
+                                            }))}
+                                            type="pnl"
+                                        />
+                                        <OptimizedChart
+                                            data={analytics.dayPerformance || []}
+                                            type="bar"
+                                            title="PnL by Day of Week"
+                                        />
                                     </div>
 
                                     <div className="grid gap-6 md:grid-cols-4">
@@ -322,6 +372,8 @@ export default function AccountDashboard({ accountId, account, trades, analytics
                                             </div>
                                         </div>
                                     </div>
+
+
                                 </div>
                             )}
                         </div>

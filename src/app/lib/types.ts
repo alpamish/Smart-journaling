@@ -15,16 +15,32 @@ export interface AnalyticsData {
         winRate?: string;
         profitFactor?: string;
         totalPnL?: string;
+        total_pnl?: string;
+        totalTradePnL?: string;
+        total_parent_trade?: number;
         monthlyReturn?: string;
         avgWin?: string;
         avgLoss?: string;
         netPnL?: string;
         totalHoldings?: string;
+        totalGridPnL?: string;
+        totalHoldingPnL?: string;
         dailyChange?: string;
+        dailySpotChange?: string;
         portfolioCount?: number;
         maxDrawdown?: string;
         avgTradePnL?: string;
         totalDays?: number;
     };
     equityCurve: any[];
+    assetPerformance: {
+        symbol: string;
+        pnl: string;
+        trades: number;
+        winRate: string;
+    }[];
+    dayPerformance: {
+        date: string;
+        value: number;
+    }[];
 }

@@ -17,7 +17,7 @@ export default function CreateGridForm({ accountId, balance, close }: { accountI
     const [gridCount, setGridCount] = useState<string>('');
     const [investment, setInvestment] = useState<string>('');
     const [leverage, setLeverage] = useState<number>(3);
-    const entryPrice = ''; // Default to calculated geometric mean
+    const [entryPrice, setEntryPrice] = useState<string>('');
     const [autoReserve, setAutoReserve] = useState<boolean>(true);
     const [manualReservedMargin, setManualReservedMargin] = useState<string>('');
     const [capitalAllocation, setCapitalAllocation] = useState<number>(0);
@@ -93,13 +93,7 @@ export default function CreateGridForm({ accountId, balance, close }: { accountI
                         </div>
                     </div>
 
-                    {/* Price Validation Message */}
-                    {isPriceInvalid && (
-                        <div className="text-[10px] text-[#f23645] flex items-center gap-1 animate-in fade-in duration-200">
-                            <AlertTriangle className="h-3 w-3" />
-                            <span>Lower price must be less than upper price</span>
-                        </div>
-                    )}
+
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
@@ -212,7 +206,7 @@ export default function CreateGridForm({ accountId, balance, close }: { accountI
                             </>
                         )}
 
-                        <input type="hidden" name="entryPrice" value={entryPrice || (!isNaN(parseFloat(lowerPrice)) && !isNaN(parseFloat(upperPrice)) ? Math.sqrt(parseFloat(lowerPrice) * parseFloat(upperPrice)) : '')} />
+                        <input type="hidden" name="entryPrice" value={entryPrice || (!isNaN(parseFloat(lowerPrice)) && !isNaN(parseFloat(upperPrice)) ? (parseFloat(lowerPrice) + parseFloat(upperPrice)) / 2 : '')} />
 
                         {/* 1. Price Range */}
                         <div className="space-y-3">
@@ -247,6 +241,33 @@ export default function CreateGridForm({ accountId, balance, close }: { accountI
                                     />
                                     <span className="text-[10px] text-[#848e9c] font-bold">USDT</span>
                                 </div>
+                            </div>
+                            {isPriceInvalid && (
+                                <div className="text-[10px] text-[#f23645] flex items-center gap-1 animate-in slide-in-from-top-1 duration-200 mt-1">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    <span>Lower price must be less than upper price</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Optional Entry Price */}
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-[#eaecef]">Entry Price (Optional)</span>
+                                <HelpCircle
+                                    className="h-3 w-3 text-[#848e9c] cursor-help hover:text-[#f0b90b] transition-colors"
+                                    onMouseEnter={(e) => handleTooltip(e, 'Optional: Specify the price where the grid activation starts. Defaults to market mid-price.')}
+                                />
+                            </div>
+                            <div className="bg-[#1e2026] rounded-lg p-2 transition-all flex items-center justify-between">
+                                <input
+                                    type="number"
+                                    value={entryPrice}
+                                    onChange={(e) => setEntryPrice(e.target.value)}
+                                    className="w-full bg-transparent border-none text-left font-bold text-sm outline-none focus:ring-0 focus:outline-none p-0 placeholder:text-[#474d57] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    placeholder="Auto (Mid-Price)"
+                                />
+                                <span className="text-[10px] text-[#848e9c] font-bold">USDT</span>
                             </div>
                         </div>
 
@@ -283,9 +304,11 @@ export default function CreateGridForm({ accountId, balance, close }: { accountI
                                 </div>
                                 {!isError && calcResults && 'gridStep' in calcResults && gridCount && (
                                     <div className="text-[10px] text-[#848e9c] mt-1 flex justify-between">
-                                        <span>Step: {calcResults.gridStep.toFixed(2)}</span>
+                                        <span>Step: {calcResults.gridStep.toFixed(calcResults.gridStep < 0.1 ? 4 : 2)} USDT</span>
                                         {parseInt(gridCount) > 0 && (
-                                            <span>≈ {(calcResults.positionSize / parseInt(gridCount)).toFixed(2)} USDT / grid</span>
+                                            <span>
+                                                Profit/Grid: {((calcResults.gridStep / parseFloat(upperPrice)) * 100).toFixed(2)}% - {((calcResults.gridStep / parseFloat(lowerPrice)) * 100).toFixed(2)}%
+                                            </span>
                                         )}
                                     </div>
                                 )}
@@ -481,9 +504,11 @@ export default function CreateGridForm({ accountId, balance, close }: { accountI
                                     </div>
 
                                     <div className="bg-[#16171a]/50 rounded-lg p-3 border border-white/5">
-                                        <div className="text-[10px] text-[#848e9c] font-bold uppercase tracking-wider">Grid Step</div>
+                                        <div className="text-[10px] text-[#848e9c] font-bold uppercase tracking-wider">Profit / Grid</div>
                                         <div className="text-sm font-bold text-[#f0b90b] mt-1">
-                                            {!isError && calcResults && 'gridStep' in calcResults ? calcResults.gridStep.toFixed(2) : '0.00'} USDT
+                                            {!isError && calcResults && 'gridStep' in calcResults ? (
+                                                `${((calcResults.gridStep / parseFloat(upperPrice)) * 100).toFixed(2)}%`
+                                            ) : '0.00%'}
                                         </div>
                                     </div>
 
@@ -568,20 +593,22 @@ export default function CreateGridForm({ accountId, balance, close }: { accountI
                 </div>
 
                 {/* Tooltip */}
-                {tooltip && (
-                    <div
-                        className="fixed z-[100] px-3 py-2 bg-[#2b2f36] text-[#eaecef] text-[10px] font-bold rounded-lg shadow-xl border border-[#474d57] pointer-events-none animate-in fade-in duration-150"
-                        style={{
-                            left: `${tooltip.x}px`,
-                            top: `${tooltip.y}px`,
-                            transform: 'translate(-50%, -100%)'
-                        }}
-                    >
-                        {tooltip.content}
-                        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-[#2b2f36]" />
-                    </div>
-                )}
-            </div>
-        </div>
+                {
+                    tooltip && (
+                        <div
+                            className="fixed z-[100] px-3 py-2 bg-[#2b2f36] text-[#eaecef] text-[10px] font-bold rounded-lg shadow-xl border border-[#474d57] pointer-events-none animate-in fade-in duration-150"
+                            style={{
+                                left: `${tooltip.x}px`,
+                                top: `${tooltip.y}px`,
+                                transform: 'translate(-50%, -100%)'
+                            }}
+                        >
+                            {tooltip.content}
+                            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-[#2b2f36]" />
+                        </div>
+                    )
+                }
+            </div >
+        </div >
     );
 }
