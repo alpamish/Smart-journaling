@@ -143,8 +143,6 @@ export default function GridList({ strategies, accountId }: { strategies: GridSt
 
                                     {grid.type === 'FUTURES' && (() => {
                                         const investmentAfterLeverage = grid.investmentAfterLeverage || (grid.allocatedCapital * (grid.leverage || 1));
-                                        const avgPrice = (grid.lowerPrice + grid.upperPrice) / 2;
-                                        const positionSize = investmentAfterLeverage / avgPrice;
 
                                         // Use stored maintenance margin or calculate fallback
                                         const maintenanceMargin = grid.maintenanceMargin ?? (investmentAfterLeverage * 0.005);
@@ -153,7 +151,7 @@ export default function GridList({ strategies, accountId }: { strategies: GridSt
                                             // Use geometric mean for average entry price as per plan.md
                                             const avgPrice = Math.sqrt(grid.lowerPrice * grid.upperPrice);
                                             const maintenanceMarginRate = grid.maintenanceMarginRate ?? 0.005;
-                                            
+
                                             if (grid.direction === 'LONG') {
                                                 // P_liq_long = P_avg × (1 - 1/Leverage + MaintenanceMarginRate)
                                                 return avgPrice * (1 - (1 / (grid.leverage || 1)) + maintenanceMarginRate);

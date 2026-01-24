@@ -1,6 +1,6 @@
 'use client';
 
-import { X, Grid, DollarSign, Activity, Calendar, TrendingUp, AlertTriangle, Layers, Target, Info } from 'lucide-react';
+import { X, Grid, DollarSign, Activity, Calendar, TrendingUp, AlertTriangle, Info } from 'lucide-react';
 import { GridStrategy } from '@prisma/client';
 
 export default function GridDetailModal({

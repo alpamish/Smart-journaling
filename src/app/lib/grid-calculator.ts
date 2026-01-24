@@ -73,7 +73,7 @@ export function calculateFuturesGrid(inputs: GridInputs): GridResults {
     } else {
         // Manual Reserve: Reserve margin comes from available balance
         // If manual value not provided, use calculated rate on available balance
-        if (manualReservedMargin) {
+        if (manualReservedMargin !== undefined) {
             reservedMargin = manualReservedMargin;
         } else if (availableBalance) {
             reservedMargin = Math.min(availableBalance * calculatedReserveRate, availableBalance);
@@ -92,25 +92,34 @@ export function calculateFuturesGrid(inputs: GridInputs): GridResults {
 
     // 6. Liquidation Price Calculation
     const liquidationPrices: { long?: number; short?: number } = {};
+    const marginRatioWithReserve = (1 / leverage) + (reservedMargin / positionSize);
 
     if (positionSide === 'LONG') {
-        // Liquidation Price (Long) using geometric mean method from plan.md
-        // P_liq_long = P_avg × (1 - 1/Leverage + MaintenanceMarginRate)
-        liquidationPrices.long = entryPrice * (1 - (1 / leverage) + maintenanceMarginRate);
+        // Liquidation Price (Long)
+        // P_liq_long = P_avg × (1 - (MarginRatio + ReservedRatio) + MaintenanceMarginRate)
+        liquidationPrices.long = entryPrice * (1 - marginRatioWithReserve + maintenanceMarginRate);
     } else if (positionSide === 'SHORT') {
-        // Liquidation Price (Short) using geometric mean method from plan.md
-        // P_liq_short = P_avg × (1 + 1/Leverage - MaintenanceMarginRate)
-        liquidationPrices.short = entryPrice * (1 + (1 / leverage) - maintenanceMarginRate);
+        // Liquidation Price (Short)
+        // P_liq_short = P_avg × (1 + (MarginRatio + ReservedRatio) - MaintenanceMarginRate)
+        liquidationPrices.short = entryPrice * (1 + marginRatioWithReserve - maintenanceMarginRate);
     } else if (positionSide === 'NEUTRAL') {
-        // Neutral Grid: Split investment and reserved margin equally
-        // Apply the same geometric mean method for both long and short positions
-        liquidationPrices.long = entryPrice * (1 - (1 / leverage) + maintenanceMarginRate);
-        liquidationPrices.short = entryPrice * (1 + (1 / leverage) - maintenanceMarginRate);
+        // Neutral Grid
+        liquidationPrices.long = entryPrice * (1 - marginRatioWithReserve + maintenanceMarginRate);
+        liquidationPrices.short = entryPrice * (1 + marginRatioWithReserve - maintenanceMarginRate);
     }
 
     // 7. Validation
+    if (availableBalance !== undefined) {
+        if (investment > availableBalance) {
+            throw new Error(`Investment (${investment}) exceeds available balance (${availableBalance})`);
+        }
+        if (manualReservedMargin && manualReservedMargin > availableBalance) {
+            throw new Error(`Reserved margin (${manualReservedMargin}) exceeds available balance (${availableBalance})`);
+        }
+    }
+
     if (usableMargin <= maintenanceMargin) {
-        throw new Error("No enough balance");
+        throw new Error("Insufficient usable margin for maintenance");
     }
     // Also fail if usable margin is negative (manual reserve too high)
     if (usableMargin < 0) {
