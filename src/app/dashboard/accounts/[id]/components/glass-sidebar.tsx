@@ -124,7 +124,7 @@ export default function GlassSidebar({
                                 key={item.id}
                                 onClick={() => onViewChange(item.id)}
                                 className={`
-                                    menu-item w-full p-4 rounded-xl border text-left
+                                    menu-item w-full p-2 rounded-xl border text-left
                                     ${isActive ? 'active border-white/20' : 'glass-card hover:bg-white/10'}
                                     transition-all duration-300
                                 `}

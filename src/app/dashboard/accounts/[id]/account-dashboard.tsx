@@ -107,7 +107,7 @@ export default function AccountDashboard({ accountId, account, trades, analytics
                                                     </div>
                                                     <div>
                                                         <p className="text-sm text-muted-foreground">Grid P&L</p>
-                                                        <p className={`text-2xl font-bold ${totalGridProfit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                                        <p className={`sm:text-base lg:text-2xl md:text-lg font-bold ${totalGridProfit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                                                             {totalGridProfit >= 0 ? '+' : ''}${totalGridProfit.toFixed(2)}
                                                         </p>
                                                     </div>
