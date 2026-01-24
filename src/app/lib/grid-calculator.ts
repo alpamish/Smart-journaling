@@ -14,6 +14,7 @@ export interface GridInputs {
     manualReservedMargin?: number;
     positionSide: 'LONG' | 'SHORT' | 'NEUTRAL';
     entryPrice?: number;
+    availableBalance?: number; // total available balance for manual reserve calculation
 }
 
 export interface GridResults {
@@ -41,14 +42,15 @@ export function calculateFuturesGrid(inputs: GridInputs): GridResults {
         autoReserveMargin,
         manualReservedMargin,
         positionSide,
-        entryPrice: providedEntryPrice
+        entryPrice: providedEntryPrice,
+        availableBalance
     } = inputs;
 
     const warnings: string[] = [];
 
     // 0. Base Calculations
-    // Entry price (default = grid midpoint)
-    const entryPrice = providedEntryPrice || (lowerPrice + upperPrice) / 2;
+    // Entry price (default = geometric mean for more accurate liquidation calculation)
+    const entryPrice = providedEntryPrice || Math.sqrt(lowerPrice * upperPrice);
     // Grid step = (upper_price - lower_price) / grid_count
     const gridStep = (upperPrice - lowerPrice) / gridCount;
 
@@ -66,13 +68,24 @@ export function calculateFuturesGrid(inputs: GridInputs): GridResults {
     // 3. Reserved Margin
     let reservedMargin = 0;
     if (autoReserveMargin) {
+        // Auto Reserve: Reserve margin comes from investment amount
         reservedMargin = investment * calculatedReserveRate;
     } else {
-        reservedMargin = manualReservedMargin || 0;
+        // Manual Reserve: Reserve margin comes from available balance
+        // If manual value not provided, use calculated rate on available balance
+        if (manualReservedMargin) {
+            reservedMargin = manualReservedMargin;
+        } else if (availableBalance) {
+            reservedMargin = Math.min(availableBalance * calculatedReserveRate, availableBalance);
+        } else {
+            reservedMargin = 0;
+        }
     }
 
     // 4. Usable Margin
-    const usableMargin = investment - reservedMargin;
+    // For auto reserve: usable margin = investment - reserved margin
+    // For manual reserve: usable margin = investment (since reserve comes from available balance)
+    const usableMargin = autoReserveMargin ? (investment - reservedMargin) : investment;
 
     // 5. Maintenance Margin
     const maintenanceMargin = positionSize * maintenanceMarginRate;
@@ -81,23 +94,18 @@ export function calculateFuturesGrid(inputs: GridInputs): GridResults {
     const liquidationPrices: { long?: number; short?: number } = {};
 
     if (positionSide === 'LONG') {
-        // Liquidation Price (Long) = entry_price * (1 - (usable_margin / position_size)) / (1 - maintenance_margin_rate)
-        liquidationPrices.long = (entryPrice * (1 - (usableMargin / positionSize))) / (1 - maintenanceMarginRate);
+        // Liquidation Price (Long) using geometric mean method from plan.md
+        // P_liq_long = P_avg × (1 - 1/Leverage + MaintenanceMarginRate)
+        liquidationPrices.long = entryPrice * (1 - (1 / leverage) + maintenanceMarginRate);
     } else if (positionSide === 'SHORT') {
-        // Liquidation Price (Short) = entry_price * (1 + (usable_margin / position_size)) / (1 + maintenance_margin_rate)
-        liquidationPrices.short = (entryPrice * (1 + (usableMargin / positionSize))) / (1 + maintenanceMarginRate);
+        // Liquidation Price (Short) using geometric mean method from plan.md
+        // P_liq_short = P_avg × (1 + 1/Leverage - MaintenanceMarginRate)
+        liquidationPrices.short = entryPrice * (1 + (1 / leverage) - maintenanceMarginRate);
     } else if (positionSide === 'NEUTRAL') {
         // Neutral Grid: Split investment and reserved margin equally
-        const halfInvestment = investment / 2;
-        const halfReserved = reservedMargin / 2;
-        const halfUsable = halfInvestment - halfReserved;
-        const halfPosition = halfInvestment * leverage;
-
-        // Calculate Long Liquidation independent of Short
-        liquidationPrices.long = (entryPrice * (1 - (halfUsable / halfPosition))) / (1 - maintenanceMarginRate);
-
-        // Calculate Short Liquidation independent of Long
-        liquidationPrices.short = (entryPrice * (1 + (halfUsable / halfPosition))) / (1 + maintenanceMarginRate);
+        // Apply the same geometric mean method for both long and short positions
+        liquidationPrices.long = entryPrice * (1 - (1 / leverage) + maintenanceMarginRate);
+        liquidationPrices.short = entryPrice * (1 + (1 / leverage) - maintenanceMarginRate);
     }
 
     // 7. Validation

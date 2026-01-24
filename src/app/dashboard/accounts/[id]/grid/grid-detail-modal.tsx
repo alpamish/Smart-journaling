@@ -22,17 +22,17 @@ export default function GridDetailModal({
     const investmentAfterLeverage = grid.investmentAfterLeverage ?? (isFutures ? grid.allocatedCapital * (grid.leverage || 1) : grid.allocatedCapital);
 
     const estimatedLiqPrice = grid.liquidationPrice ?? (() => {
-        if (!isFutures || !grid.entryPrice || !grid.leverage) return null;
-        const avgPrice = (grid.lowerPrice + grid.upperPrice) / 2;
-        const positionSize = investmentAfterLeverage / avgPrice;
+        if (!isFutures || !grid.leverage) return null;
+        // Use geometric mean for average entry price as per plan.md
+        const avgPrice = Math.sqrt(grid.lowerPrice * grid.upperPrice);
         const maintenanceMarginRate = grid.maintenanceMarginRate ?? 0.005;
-        const liqAmount = investmentAfterLeverage - (grid.allocatedCapital * (1 - maintenanceMarginRate));
-        const priceChange = liqAmount / positionSize;
 
         if (grid.direction === 'LONG') {
-            return avgPrice - priceChange;
+            // P_liq_long = P_avg × (1 - 1/Leverage + MaintenanceMarginRate)
+            return avgPrice * (1 - (1 / grid.leverage) + maintenanceMarginRate);
         } else if (grid.direction === 'SHORT') {
-            return avgPrice + priceChange;
+            // P_liq_short = P_avg × (1 + 1/Leverage - MaintenanceMarginRate)
+            return avgPrice * (1 + (1 / grid.leverage) - maintenanceMarginRate);
         }
         return null;
     })();

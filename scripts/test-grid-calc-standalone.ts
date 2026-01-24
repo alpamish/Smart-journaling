@@ -11,6 +11,7 @@ export interface GridInputs {
     manualReservedMargin?: number;
     positionSide: 'LONG' | 'SHORT' | 'NEUTRAL';
     entryPrice?: number;
+    availableBalance?: number;
 }
 
 export function calculateFuturesGrid(inputs: GridInputs) {
@@ -24,12 +25,13 @@ export function calculateFuturesGrid(inputs: GridInputs) {
         autoReserveMargin,
         manualReservedMargin,
         positionSide,
-        entryPrice: providedEntryPrice
+        entryPrice: providedEntryPrice,
+        availableBalance
     } = inputs;
 
     const warnings: string[] = [];
 
-    const entryPrice = providedEntryPrice || (lowerPrice + upperPrice) / 2;
+    const entryPrice = providedEntryPrice || Math.sqrt(lowerPrice * upperPrice);
     const gridStep = (upperPrice - lowerPrice) / gridCount;
     const positionSize = investment * leverage;
 
@@ -38,28 +40,38 @@ export function calculateFuturesGrid(inputs: GridInputs) {
 
     let reservedMargin = 0;
     if (autoReserveMargin) {
+        // Auto Reserve: Reserve margin comes from investment amount
         reservedMargin = investment * calculatedReserveRate;
     } else {
-        reservedMargin = manualReservedMargin || 0;
+        // Manual Reserve: Reserve margin comes from available balance
+        // If manual value not provided, use calculated rate on available balance
+        if (manualReservedMargin) {
+            reservedMargin = manualReservedMargin;
+        } else if (availableBalance) {
+            reservedMargin = Math.min(availableBalance * calculatedReserveRate, availableBalance);
+        } else {
+            reservedMargin = 0;
+        }
     }
 
-    const usableMargin = investment - reservedMargin;
+    // 4. Usable Margin
+    // For auto reserve: usable margin = investment - reserved margin
+    // For manual reserve: usable margin = investment (since reserve comes from available balance)
+    const usableMargin = autoReserveMargin ? (investment - reservedMargin) : investment;
     const maintenanceMargin = positionSize * maintenanceMarginRate;
 
     const liquidationPrices: { long?: number; short?: number } = {};
 
     if (positionSide === 'LONG') {
-        liquidationPrices.long = (entryPrice * (1 - (usableMargin / positionSize))) / (1 - maintenanceMarginRate);
+        // Liquidation Price (Long) using geometric mean method from plan.md
+        liquidationPrices.long = entryPrice * (1 - (1 / leverage) + maintenanceMarginRate);
     } else if (positionSide === 'SHORT') {
-        liquidationPrices.short = (entryPrice * (1 + (usableMargin / positionSize))) / (1 + maintenanceMarginRate);
+        // Liquidation Price (Short) using geometric mean method from plan.md
+        liquidationPrices.short = entryPrice * (1 + (1 / leverage) - maintenanceMarginRate);
     } else if (positionSide === 'NEUTRAL') {
-        const halfInvestment = investment / 2;
-        const halfReserved = reservedMargin / 2;
-        const halfUsable = halfInvestment - halfReserved;
-        const halfPosition = halfInvestment * leverage;
-
-        liquidationPrices.long = (entryPrice * (1 - (halfUsable / halfPosition))) / (1 - maintenanceMarginRate);
-        liquidationPrices.short = (entryPrice * (1 + (halfUsable / halfPosition))) / (1 + maintenanceMarginRate);
+        // Neutral Grid: Apply the same geometric mean method for both long and short positions
+        liquidationPrices.long = entryPrice * (1 - (1 / leverage) + maintenanceMarginRate);
+        liquidationPrices.short = entryPrice * (1 + (1 / leverage) - maintenanceMarginRate);
     }
 
     if (usableMargin <= maintenanceMargin) {
@@ -136,7 +148,37 @@ runTest('Standard LONG', {
     reserveRate: true
 });
 
-// Test 2: Validation Fail
+// Test 2: Plan.md Example (BTC Long Grid)
+runTest('Plan.md Example BTC Long', {
+    lowerPrice: 50000,
+    upperPrice: 60000,
+    gridCount: 50,
+    investment: 1000,
+    leverage: 10,
+    maintenanceMarginRate: 0.005,
+    autoReserveMargin: true,
+    positionSide: 'LONG'
+}, {
+    expectedLiqPrice: 49569 // From plan.md calculation
+});
+
+// Test 3: Manual Reserve from Available Balance
+runTest('Manual Reserve from Available Balance', {
+    lowerPrice: 50000,
+    upperPrice: 60000,
+    gridCount: 50,
+    investment: 1000,
+    leverage: 10,
+    maintenanceMarginRate: 0.005,
+    autoReserveMargin: false,
+    manualReservedMargin: 200,
+    availableBalance: 2000,
+    positionSide: 'LONG'
+}, {
+    expectedReservedMargin: 200
+});
+
+// Test 4: Validation Fail
 runTest('Validation Fail', {
     lowerPrice: 50000,
     upperPrice: 60000,

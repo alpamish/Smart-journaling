@@ -150,12 +150,16 @@ export default function GridList({ strategies, accountId }: { strategies: GridSt
                                         const maintenanceMargin = grid.maintenanceMargin ?? (investmentAfterLeverage * 0.005);
 
                                         const liqPrice = grid.liquidationPrice ?? (() => {
-                                            const lossAtLiquidation = grid.allocatedCapital - maintenanceMargin;
-                                            const priceChange = lossAtLiquidation / positionSize;
+                                            // Use geometric mean for average entry price as per plan.md
+                                            const avgPrice = Math.sqrt(grid.lowerPrice * grid.upperPrice);
+                                            const maintenanceMarginRate = grid.maintenanceMarginRate ?? 0.005;
+                                            
                                             if (grid.direction === 'LONG') {
-                                                return avgPrice - priceChange;
+                                                // P_liq_long = P_avg × (1 - 1/Leverage + MaintenanceMarginRate)
+                                                return avgPrice * (1 - (1 / (grid.leverage || 1)) + maintenanceMarginRate);
                                             } else if (grid.direction === 'SHORT') {
-                                                return avgPrice + priceChange;
+                                                // P_liq_short = P_avg × (1 + 1/Leverage - MaintenanceMarginRate)
+                                                return avgPrice * (1 + (1 / (grid.leverage || 1)) - maintenanceMarginRate);
                                             }
                                             return null;
                                         })();

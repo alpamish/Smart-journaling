@@ -1,4 +1,4 @@
-import { fetchAccountById, fetchTradesByAccountId, fetchGridStrategies } from '@/app/lib/data';
+import { fetchAccountById, fetchTradesByAccountId, fetchGridStrategies, fetchSpotHoldings } from '@/app/lib/data';
 import { notFound } from 'next/navigation';
 import LogTradeButton from './log-trade-button';
 import GridList from './grid/grid-list';
@@ -159,7 +159,7 @@ async function DashboardContent({ id }: { id: string }) {
                     <CollapsibleSection
                         title="Active Grid Strategies"
                         defaultExpanded={true}
-                        headerActions={<CreateGridButton accountId={id} />}
+                        headerActions={<CreateGridButton accountId={id} account={account} />}
                     >
                         <GridList strategies={strategies} accountId={id} />
                     </CollapsibleSection>

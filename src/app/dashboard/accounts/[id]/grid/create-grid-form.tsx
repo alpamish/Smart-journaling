@@ -39,6 +39,7 @@ export default function CreateGridForm({ accountId, balance, close }: { accountI
             manualReservedMargin: parseFloat(manualReservedMargin) || 0,
             positionSide: direction,
             entryPrice: entryPrice ? parseFloat(entryPrice) : undefined,
+            availableBalance: balance, // Pass available balance for manual reserve calculation
         };
 
         try {
@@ -46,7 +47,7 @@ export default function CreateGridForm({ accountId, balance, close }: { accountI
         } catch (e: any) {
             return { error: e.message };
         }
-    }, [lowerPrice, upperPrice, gridCount, investment, leverage, autoReserve, manualReservedMargin, direction, entryPrice]);
+    }, [lowerPrice, upperPrice, gridCount, investment, leverage, autoReserve, manualReservedMargin, direction, entryPrice, balance]);
 
     useEffect(() => {
         if (state?.success) {
@@ -176,10 +177,14 @@ export default function CreateGridForm({ accountId, balance, close }: { accountI
                                 <input type="hidden" name="maintenanceMargin" value={('maintenanceMargin' in calcResults) ? calcResults.maintenanceMargin : ''} />
                                 <input type="hidden" name="liquidationPrice" value={('liquidationPrices' in calcResults) ? (calcResults.liquidationPrices.long || calcResults.liquidationPrices.short || '') : ''} />
                                 <input type="hidden" name="investmentAfterLeverage" value={('positionSize' in calcResults) ? calcResults.positionSize : ''} />
+                                <input type="hidden" name="reservedMargin" value={('reservedMargin' in calcResults) ? calcResults.reservedMargin : ''} />
+                                <input type="hidden" name="usableMargin" value={('usableMargin' in calcResults) ? calcResults.usableMargin : ''} />
+                                <input type="hidden" name="reserveRate" value={('reserveRate' in calcResults) ? calcResults.reserveRate : ''} />
+                                <input type="hidden" name="autoReserveMargin" value={autoReserve.toString()} />
                             </>
                         )}
 
-                        <input type="hidden" name="entryPrice" value={entryPrice || (!isNaN(parseFloat(lowerPrice)) && !isNaN(parseFloat(upperPrice)) ? (parseFloat(lowerPrice) + parseFloat(upperPrice)) / 2 : '')} />
+                        <input type="hidden" name="entryPrice" value={entryPrice || (!isNaN(parseFloat(lowerPrice)) && !isNaN(parseFloat(upperPrice)) ? Math.sqrt(parseFloat(lowerPrice) * parseFloat(upperPrice)) : '')} />
 
                         {/* 1. Price Range */}
                         <div className="space-y-3">
@@ -296,12 +301,24 @@ export default function CreateGridForm({ accountId, balance, close }: { accountI
                                     <div className="text-[10px] text-[#848e9c]">
                                         {!isError && calcResults && 'reservedMargin' in calcResults ? (
                                             <>
-                                                Reserved: <span className="text-[#f0b90b]">{calcResults.reservedMargin.toFixed(1)}</span>
-                                                {' | '}
-                                                Usable: <span className="text-[#0ecb81]">{calcResults.usableMargin.toFixed(1)}</span>
+                                                {autoReserve ? (
+                                                    <>
+                                                        Reserved: <span className="text-[#f0b90b]">{calcResults.reservedMargin.toFixed(1)}</span>
+                                                        {' | '}
+                                                        Usable: <span className="text-[#0ecb81]">{calcResults.usableMargin.toFixed(1)}</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        Reserved: <span className="text-[#f0b90b]">{calcResults.reservedMargin.toFixed(1)}</span>
+                                                        {' | '}
+                                                        Usable: <span className="text-[#0ecb81]">{calcResults.usableMargin.toFixed(1)}</span>
+                                                        {' | '}
+                                                        From Avbl: <span className="text-[#848e9c]">{balance.toFixed(1)}</span>
+                                                    </>
+                                                )}
                                             </>
                                         ) : (
-                                            'Initial Margin'
+                                            autoReserve ? 'Initial Margin' : 'Manual Reserve from Balance'
                                         )}
                                     </div>
                                     <div className="flex items-center gap-1.5 ml-auto">
@@ -319,15 +336,47 @@ export default function CreateGridForm({ accountId, balance, close }: { accountI
 
                             {/* Manual Margin Input */}
                             {!autoReserve && (
-                                <div className="bg-[#1e2026] rounded-lg p-2 transition-all flex items-center justify-between">
-                                    <input
-                                        type="number"
-                                        value={manualReservedMargin}
-                                        onChange={(e) => setManualReservedMargin(e.target.value)}
-                                        className="w-full bg-transparent border-none text-left font-bold text-sm focus:ring-0 p-0 text-[#f0b90b]"
-                                        placeholder="Enter reserve margin"
-                                    />
-                                    <span className="text-[10px] text-[#f0b90b] font-bold">USDT</span>
+                                <div className="space-y-2">
+                                    <div className="bg-[#1e2026] rounded-lg p-2 transition-all flex items-center justify-between">
+                                        <input
+                                            type="number"
+                                            value={manualReservedMargin}
+                                            onChange={(e) => setManualReservedMargin(e.target.value)}
+                                            className="w-full bg-transparent border-none text-left font-bold text-sm focus:ring-0 p-0 text-[#f0b90b]"
+                                            placeholder="Enter reserve margin"
+                                            max={balance}
+                                        />
+                                        <span className="text-[10px] text-[#f0b90b] font-bold">USDT</span>
+                                    </div>
+                                    <div className="text-[9px] text-[#848e9c] flex justify-between">
+                                        <span>Available: {balance.toFixed(2)} USDT</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const inputs: GridInputs = {
+                                                    lowerPrice: parseFloat(lowerPrice),
+                                                    upperPrice: parseFloat(upperPrice),
+                                                    gridCount: parseInt(gridCount),
+                                                    investment: parseFloat(investment),
+                                                    leverage: leverage,
+                                                    maintenanceMarginRate: 0.05,
+                                                    autoReserveMargin: false,
+                                                    positionSide: direction,
+                                                    availableBalance: balance,
+                                                };
+                                                try {
+                                                    const result = calculateFuturesGrid(inputs);
+                                                    setManualReservedMargin(result.reservedMargin.toFixed(2));
+                                                } catch (e) {
+                                                    // If calculation fails, use 50% of available balance as fallback
+                                                    setManualReservedMargin((balance * 0.5).toFixed(2));
+                                                }
+                                            }}
+                                            className="text-[#f0b90b] hover:text-[#f0b90b]/80 transition-colors"
+                                        >
+                                            Use Suggested
+                                        </button>
+                                    </div>
                                 </div>
                             )}
 
