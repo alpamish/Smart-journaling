@@ -785,3 +785,87 @@ export async function closeSpotHolding(
     revalidatePath(`/dashboard/accounts/${accountId}`);
     return { success: true };
 }
+
+export async function depositToAccount(
+    accountId: string,
+    prevState: any,
+    formData: FormData,
+) {
+    const session = await auth();
+    if (!session?.user?.id) return { error: 'Unauthorized' };
+
+    const amount = parseFloat(formData.get('amount') as string);
+    const note = formData.get('note') as string || '';
+
+    if (isNaN(amount) || amount <= 0) {
+        return { error: 'Invalid deposit amount' };
+    }
+
+    try {
+        const account = await prisma.account.findUnique({
+            where: { id: accountId, userId: session.user.id }
+        });
+
+        if (!account) return { error: 'Account not found' };
+
+        await prisma.account.update({
+            where: { id: accountId },
+            data: {
+                currentBalance: { increment: amount },
+                equity: { increment: amount }
+            }
+        });
+
+    } catch (error) {
+        console.error('Deposit Error:', error);
+        return { error: 'Failed to deposit funds' };
+    }
+
+    revalidatePath(`/dashboard/accounts/${accountId}`);
+    revalidatePath('/dashboard');
+    return { success: true };
+}
+
+export async function withdrawFromAccount(
+    accountId: string,
+    prevState: any,
+    formData: FormData,
+) {
+    const session = await auth();
+    if (!session?.user?.id) return { error: 'Unauthorized' };
+
+    const amount = parseFloat(formData.get('amount') as string);
+    const note = formData.get('note') as string || '';
+
+    if (isNaN(amount) || amount <= 0) {
+        return { error: 'Invalid withdrawal amount' };
+    }
+
+    try {
+        const account = await prisma.account.findUnique({
+            where: { id: accountId, userId: session.user.id }
+        });
+
+        if (!account) return { error: 'Account not found' };
+
+        if (amount > account.currentBalance) {
+            return { error: 'Insufficient balance for withdrawal' };
+        }
+
+        await prisma.account.update({
+            where: { id: accountId },
+            data: {
+                currentBalance: { decrement: amount },
+                equity: { decrement: amount }
+            }
+        });
+
+    } catch (error) {
+        console.error('Withdrawal Error:', error);
+        return { error: 'Failed to withdraw funds' };
+    }
+
+    revalidatePath(`/dashboard/accounts/${accountId}`);
+    revalidatePath('/dashboard');
+    return { success: true };
+}

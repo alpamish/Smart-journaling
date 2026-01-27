@@ -11,6 +11,7 @@ import OptimizedChart from './analytics/optimized-chart';
 import OptimizedTradesTable from './optimized-trades-table';
 import GlassSidebar, { ViewType } from './components/glass-sidebar';
 import MobileSidebar from './components/mobile-sidebar';
+import BalanceButtons from './components/balance-buttons';
 import { Menu } from 'lucide-react';
 import { Account, SpotHolding } from '@prisma/client';
 import { TradeWithImages, AnalyticsData, Holding } from '@/app/lib/types';
@@ -283,16 +284,23 @@ export default function AccountDashboard({ accountId, account, trades, analytics
                                             <h1 className="text-3xl font-bold tracking-tight text-foreground">Performance Analytics</h1>
                                             <p className="text-muted-foreground mt-1">Comprehensive metrics and charts for your trading performance</p>
                                         </div>
-                                        <div className="flex gap-6 items-center px-4 py-3 bg-muted/40 rounded-2xl border border-border/50">
-                                            <div className="flex flex-col">
-                                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Initial Balance</span>
-                                                <span className="text-lg font-bold text-foreground">${account.initialBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                                            <div className="flex gap-6 items-center px-4 py-3 bg-muted/40 rounded-2xl border border-border/50">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Initial Balance</span>
+                                                    <span className="text-lg font-bold text-foreground">${account.initialBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                </div>
+                                                <div className="h-8 w-px bg-border/50" />
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total Balance</span>
+                                                    <span className="text-xl font-bold text-foreground">${account.currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                </div>
                                             </div>
-                                            <div className="h-8 w-px bg-border/50" />
-                                            <div className="flex flex-col">
-                                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total Balance</span>
-                                                <span className="text-xl font-bold text-foreground">${account.currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                            </div>
+                                            <BalanceButtons
+                                                accountId={accountId}
+                                                currentBalance={account.currentBalance}
+                                                currency={account.currency}
+                                            />
                                         </div>
                                     </div>
 
