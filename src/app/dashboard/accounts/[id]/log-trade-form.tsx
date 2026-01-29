@@ -3,6 +3,8 @@
 import { useActionState, useState, useEffect, useMemo } from 'react';
 import { createTrade, getTradeConditions } from '@/app/lib/actions';
 import { TradeCondition } from '@prisma/client';
+import { Search } from 'lucide-react';
+import SymbolSelector from './grid/symbol-selector';
 import './log-trade-form.css';
 
 export default function LogTradeForm({ accountId, balance, close }: { accountId: string, balance: number, close: () => void }) {
@@ -11,6 +13,9 @@ export default function LogTradeForm({ accountId, balance, close }: { accountId:
 
     // Form State for dynamic logic
     const [segment, setSegment] = useState('CRYPTO');
+    const [symbol, setSymbol] = useState<string>('');
+    const [showSymbolSelector, setShowSymbolSelector] = useState<boolean>(false);
+    const [currentPrice, setCurrentPrice] = useState<string>('');
     const [quantity, setQuantity] = useState<number>(0);
     const [entryPrice, setEntryPrice] = useState<number>(0);
     const [leverage, setLeverage] = useState<number>(3);
@@ -157,6 +162,19 @@ export default function LogTradeForm({ accountId, balance, close }: { accountId:
         }
     };
 
+    const handleSymbolSelect = (selectedSymbol: string, price: string) => {
+        setSymbol(selectedSymbol);
+        setCurrentPrice(price);
+        // Auto-fill entry price with current market price if not already set
+        if (!entryPrice || entryPrice === 0) {
+            setEntryPrice(parseFloat(price));
+            const input = document.querySelector('input[name="entryPrice"]') as HTMLInputElement;
+            if (input) {
+                input.value = price;
+            }
+        }
+    };
+
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
 
@@ -277,7 +295,24 @@ export default function LogTradeForm({ accountId, balance, close }: { accountId:
                             <div className="md:col-span-2 grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Symbol</label>
-                                    <input type="text" name="symbol" required placeholder="e.g. BTCUSDT" className="w-full rounded-lg border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 focus:ring-2 focus:ring-blue-500 transition-all" />
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            name="symbol"
+                                            value={symbol}
+                                            onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                                            onFocus={() => setShowSymbolSelector(true)}
+                                            required
+                                            placeholder="Click to browse pairs"
+                                            className="w-full rounded-lg border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 pr-10 focus:ring-2 focus:ring-blue-500 transition-all uppercase"
+                                        />
+                                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                                    </div>
+                                    {currentPrice && (
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                            Current: <span className="font-semibold text-slate-700 dark:text-slate-300">${parseFloat(currentPrice).toLocaleString()}</span>
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Side</label>
@@ -728,6 +763,15 @@ export default function LogTradeForm({ accountId, balance, close }: { accountId:
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Symbol Selector Modal */}
+            {showSymbolSelector && (
+                <SymbolSelector
+                    isFutures={true}
+                    onSelect={handleSymbolSelect}
+                    onClose={() => setShowSymbolSelector(false)}
+                />
             )}
         </div>
     );

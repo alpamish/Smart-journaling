@@ -2,17 +2,28 @@
 
 import { useActionState, useState, useEffect } from 'react';
 import { createSpotHolding } from '@/app/lib/actions';
-import { X, Coins, Target, Info, Hash, ArrowUpRight, Save, Layout } from 'lucide-react';
+import { X, Coins, Target, Info, Hash, ArrowUpRight, Save, Layout, Search } from 'lucide-react';
+import SymbolSelector from '../grid/symbol-selector';
 
 export default function AddHoldingForm({ accountId, close }: { accountId: string, close: () => void }) {
     const createHoldingWithId = createSpotHolding.bind(null, accountId);
     const [state, formAction, isPending] = useActionState(createHoldingWithId, null);
+    const [showSymbolSelector, setShowSymbolSelector] = useState<boolean>(false);
+    const [assetSymbol, setAssetSymbol] = useState<string>('');
+    const [currentPrice, setCurrentPrice] = useState<string>('');
 
     useEffect(() => {
         if (state?.success) {
             close();
         }
     }, [state, close]);
+
+    const handleSymbolSelect = (selectedSymbol: string, price: string) => {
+        // Extract base asset from symbol (e.g., BTCUSDT -> BTC)
+        const baseAsset = selectedSymbol.replace('USDT', '');
+        setAssetSymbol(baseAsset);
+        setCurrentPrice(price);
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 transition-all duration-300 animate-in fade-in">
@@ -45,13 +56,24 @@ export default function AddHoldingForm({ accountId, close }: { accountId: string
                             Asset Symbol
                         </label>
                         <div className="relative group">
-                            <input
-                                type="text"
-                                name="assetSymbol"
-                                required
-                                placeholder="e.g. BTC"
-                                className="h-11 w-full rounded-xl border border-input bg-background/50 px-4 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all uppercase font-medium"
-                            />
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    name="assetSymbol"
+                                    value={assetSymbol}
+                                    onChange={(e) => setAssetSymbol(e.target.value.toUpperCase())}
+                                    onFocus={() => setShowSymbolSelector(true)}
+                                    required
+                                    placeholder="Click to browse assets"
+                                    className="h-11 w-full rounded-xl border border-input bg-background/50 px-4 py-2 pr-10 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all uppercase font-medium"
+                                />
+                                <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                            </div>
+                            {currentPrice && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Current price: <span className="font-semibold text-foreground">${parseFloat(currentPrice).toLocaleString()}</span>
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -173,6 +195,15 @@ export default function AddHoldingForm({ accountId, close }: { accountId: string
                     </div>
                 </form>
             </div>
+
+            {/* Symbol Selector Modal */}
+            {showSymbolSelector && (
+                <SymbolSelector
+                    isFutures={false}
+                    onSelect={handleSymbolSelect}
+                    onClose={() => setShowSymbolSelector(false)}
+                />
+            )}
         </div>
     );
 }

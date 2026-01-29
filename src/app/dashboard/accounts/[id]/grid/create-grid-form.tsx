@@ -3,7 +3,8 @@
 import { useActionState, useState, useEffect, useMemo } from 'react';
 import { createGridStrategy } from '@/app/lib/actions';
 import { calculateFuturesGrid, GridInputs, GridResults } from '@/app/lib/grid-calculator';
-import { ChevronLeft, Info, HelpCircle, AlertTriangle, TrendingUp } from 'lucide-react';
+import { ChevronLeft, Info, HelpCircle, AlertTriangle, TrendingUp, Search } from 'lucide-react';
+import SymbolSelector from './symbol-selector';
 
 export default function CreateGridForm({ accountId, balance, close }: { accountId: string, balance: number, close: () => void }) {
     const createGridWithId = createGridStrategy.bind(null, accountId);
@@ -22,6 +23,7 @@ export default function CreateGridForm({ accountId, balance, close }: { accountI
     const [manualReservedMargin, setManualReservedMargin] = useState<string>('');
     const [capitalAllocation, setCapitalAllocation] = useState<number>(0);
     const [tooltip, setTooltip] = useState<{ content: string; x: number; y: number } | null>(null);
+    const [showSymbolSelector, setShowSymbolSelector] = useState<boolean>(false);
 
     const isPriceInvalid = lowerPrice !== '' && upperPrice !== '' && parseFloat(lowerPrice) >= parseFloat(upperPrice);
 
@@ -66,6 +68,14 @@ export default function CreateGridForm({ accountId, balance, close }: { accountI
             x: rect.left + rect.width / 2,
             y: rect.top - 8
         });
+    };
+
+    const handleSymbolSelect = (selectedSymbol: string, currentPrice: string) => {
+        setSymbol(selectedSymbol);
+        // Optionally auto-fill entry price with current market price
+        if (!entryPrice) {
+            setEntryPrice(currentPrice);
+        }
     };
 
     return (
@@ -127,14 +137,18 @@ export default function CreateGridForm({ accountId, balance, close }: { accountI
                     {/* Pair Selector */}
                     <div className="space-y-2">
                         <label className="text-[10px] uppercase tracking-wider text-[#848e9c] font-bold">Trading pair</label>
-                        <div className="flex items-center justify-between bg-[#1e2026] rounded-lg p-1 transition-all">
-                            <input
-                                type="text"
-                                value={symbol}
-                                onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                                className="w-full bg-transparent border-none font-bold outline-none focus:ring-0 focus:outline-none p-2 uppercase"
-                                placeholder="BTCUSDT"
-                            />
+                        <div className="relative">
+                            <div className="flex items-center justify-between bg-[#1e2026] rounded-lg p-1 transition-all border border-transparent hover:border-[#2b2f36] focus-within:border-[#f0b90b]/50">
+                                <input
+                                    type="text"
+                                    value={symbol}
+                                    onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                                    onFocus={() => setShowSymbolSelector(true)}
+                                    className="w-full bg-transparent border-none font-bold outline-none focus:ring-0 focus:outline-none p-2 uppercase pr-8"
+                                    placeholder="Click to browse pairs"
+                                />
+                                <Search className="h-4 w-4 text-[#848e9c] mr-2 pointer-events-none" />
+                            </div>
                         </div>
                     </div>
 
@@ -253,7 +267,7 @@ export default function CreateGridForm({ accountId, balance, close }: { accountI
                         {/* Optional Entry Price */}
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold text-[#eaecef]">Entry Price (Optional)</span>
+                                <span className="text-xs font-bold text-[#eaecef]">Entry Price</span>
                                 <HelpCircle
                                     className="h-3 w-3 text-[#848e9c] cursor-help hover:text-[#f0b90b] transition-colors"
                                     onMouseEnter={(e) => handleTooltip(e, 'Optional: Specify the price where the grid activation starts. Defaults to market mid-price.')}
@@ -609,6 +623,15 @@ export default function CreateGridForm({ accountId, balance, close }: { accountI
                     )
                 }
             </div >
+
+            {/* Symbol Selector Modal */}
+            {showSymbolSelector && (
+                <SymbolSelector
+                    isFutures={strategyType === 'FUTURES'}
+                    onSelect={handleSymbolSelect}
+                    onClose={() => setShowSymbolSelector(false)}
+                />
+            )}
         </div >
     );
 }
