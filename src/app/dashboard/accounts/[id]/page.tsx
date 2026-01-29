@@ -25,7 +25,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
             accountId={id}
             account={account}
             trades={trades}
-            analytics={analytics || { stats: {}, equityCurve: [] }}
+            analytics={analytics || { stats: {}, equityCurve: [], assetPerformance: [], dayPerformance: [] }}
             strategies={strategies}
             holdings={holdings}
         />

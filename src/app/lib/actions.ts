@@ -812,7 +812,8 @@ export async function depositToAccount(
             where: { id: accountId },
             data: {
                 currentBalance: { increment: amount },
-                equity: { increment: amount }
+                equity: { increment: amount },
+                initialBalance: { increment: amount }
             }
         });
 
@@ -856,7 +857,8 @@ export async function withdrawFromAccount(
             where: { id: accountId },
             data: {
                 currentBalance: { decrement: amount },
-                equity: { decrement: amount }
+                equity: { decrement: amount },
+                initialBalance: { decrement: amount }
             }
         });
 

@@ -11,9 +11,12 @@ import {
     Activity,
     ChevronLeft,
     ChevronRight,
-    Home
+    Home,
+    Plus
 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 export type ViewType = 'grid' | 'holdings' | 'journal' | 'analytics';
 
@@ -60,6 +63,7 @@ interface GlassSidebarProps {
     accountId: string;
     currentView: ViewType;
     onViewChange: (view: ViewType) => void;
+    onLogTradeToggle?: () => void;
     className?: string;
     stats?: {
         winRate?: string;
@@ -72,6 +76,7 @@ export default function GlassSidebar({
     accountId,
     currentView,
     onViewChange,
+    onLogTradeToggle,
     className = '',
     stats = {
         winRate: '0%',
@@ -93,12 +98,18 @@ export default function GlassSidebar({
                     <div className="flex items-center justify-between">
                         {!isCollapsed && (
                             <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
-                                    <Activity className="h-5 w-5 text-white" />
+                                <div className="h-10 w-10 rounded-xl overflow-hidden bg-white flex items-center justify-center shadow-lg">
+                                    <Image
+                                        src="/logo.jpg"
+                                        alt="Smart Journaling Logo"
+                                        width={40}
+                                        height={40}
+                                        className="object-cover"
+                                    />
                                 </div>
-                                <div>
-                                    <h3 className="text-sm font-semibold text-foreground">Dashboard</h3>
-                                    <p className="text-xs text-muted-foreground">Quick Navigation</p>
+                                <div className="min-w-0">
+                                    <h3 className="text-sm font-bold text-foreground truncate">Smart Journaling</h3>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Trading Dashboard</p>
                                 </div>
                             </div>
                         )}
@@ -210,6 +221,41 @@ export default function GlassSidebar({
                         </div>
                     </div>
                 )}
+
+                <div className="p-4 border-t border-white/10">
+                    {!isCollapsed ? (
+                        <div className="space-y-4">
+                            <div className="flex flex-col gap-2">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Quick Action</span>
+                                <button
+                                    onClick={onLogTradeToggle}
+                                    className="flex items-center gap-3 w-full p-2.5 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-all duration-300 group"
+                                >
+                                    <div className="h-8 w-8 rounded-lg bg-blue-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 group-hover:scale-110 transition-transform">
+                                        <Plus className="h-4 w-4" />
+                                    </div>
+                                    <span className="text-sm font-bold text-blue-400 group-hover:text-blue-300">Log Future Trade</span>
+                                </button>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-4">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground whitespace-nowrap">Appearance</span>
+                                <ThemeToggle />
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center gap-4">
+                            <button
+                                onClick={onLogTradeToggle}
+                                className="h-10 w-10 rounded-xl bg-blue-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 hover:scale-110 transition-transform"
+                                title="Log Future Trade"
+                            >
+                                <Plus className="h-5 w-5" />
+                            </button>
+                            <ThemeToggle />
+                        </div>
+                    )}
+                </div>
             </div>
         </aside>
     );

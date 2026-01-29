@@ -51,7 +51,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light) {
     --background: #020617;
     --foreground: #f8fafc;
     --card: #0f172a;
@@ -72,6 +72,28 @@
     --input: #1e293b;
     --ring: #cbd5e1;
   }
+}
+
+.dark {
+  --background: #020617;
+  --foreground: #f8fafc;
+  --card: #0f172a;
+  --card-foreground: #f8fafc;
+  --popover: #020617;
+  --popover-foreground: #f8fafc;
+  --primary: #f8fafc;
+  --primary-foreground: #0f172a;
+  --secondary: #1e293b;
+  --secondary-foreground: #f8fafc;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: #1e293b;
+  --accent-foreground: #f8fafc;
+  --destructive: #7f1d1d;
+  --destructive-foreground: #f8fafc;
+  --border: #1e293b;
+  --input: #1e293b;
+  --ring: #cbd5e1;
 }
 
 @layer base {
@@ -165,18 +187,18 @@
 
   /* Sidebar & Dashboard Refactored Styles */
   .glass-sidebar {
-    background: rgba(15, 23, 42, 0.4);
+    background: color-mix(in srgb, var(--background), transparent 60%);
     backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 20px 0 50px rgba(0, 0, 0, 0.2);
+    border-right: 1px solid var(--border);
+    box-shadow: 20px 0 50px rgba(0, 0, 0, 0.05);
   }
 
   .glass-card {
-    background: rgba(255, 255, 255, 0.02);
+    background: color-mix(in srgb, var(--card), transparent 80%);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
@@ -201,7 +223,7 @@
 
   .menu-item:hover {
     transform: translateX(4px);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--muted);
   }
 
   .menu-item.active {
@@ -252,8 +274,13 @@
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 @keyframes slideInUp {
@@ -261,6 +288,7 @@
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -271,6 +299,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -281,6 +310,7 @@
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -292,6 +322,7 @@
     opacity: 0;
     transform: scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: scale(1);

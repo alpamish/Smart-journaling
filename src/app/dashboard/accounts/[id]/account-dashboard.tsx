@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import LogTradeButton from './log-trade-button';
+import LogTradeForm from './log-trade-form';
 import GridList from './grid/grid-list';
 import CreateGridButton from './grid/create-grid-button';
 import AddHoldingButton from './holdings/add-holding-button';
@@ -28,6 +28,7 @@ interface AccountDashboardProps {
 export default function AccountDashboard({ accountId, account, trades, analytics, strategies, holdings }: AccountDashboardProps) {
     const [currentView, setCurrentView] = useState<ViewType>('analytics');
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+    const [isLogTradeOpen, setIsLogTradeOpen] = useState(false);
 
     // Calculate total grid profit from strategies
     const totalGridProfit = strategies.reduce((sum, s) => sum + (Number(s.totalProfit) || 0), 0);
@@ -47,6 +48,7 @@ export default function AccountDashboard({ accountId, account, trades, analytics
                 onViewChange={setCurrentView}
                 isOpen={mobileSidebarOpen}
                 onClose={() => setMobileSidebarOpen(false)}
+                onLogTradeToggle={() => setIsLogTradeOpen(true)}
             />
 
             <div className="flex flex-1 overflow-hidden">
@@ -54,6 +56,7 @@ export default function AccountDashboard({ accountId, account, trades, analytics
                     accountId={accountId}
                     currentView={currentView}
                     onViewChange={setCurrentView}
+                    onLogTradeToggle={() => setIsLogTradeOpen(true)}
                     className="hidden lg:flex flex-shrink-0 h-screen sticky top-0"
                     stats={{
                         winRate: analytics.stats?.winRate ? `${analytics.stats.winRate}%` : '0%',
@@ -220,7 +223,15 @@ export default function AccountDashboard({ accountId, account, trades, analytics
                                             <h1 className="text-3xl font-bold tracking-tight text-foreground">Trade Journal</h1>
                                             <p className="text-muted-foreground mt-1">Complete history of all your trades and entries</p>
                                         </div>
-                                        <LogTradeButton accountId={accountId} balance={account.currentBalance} />
+                                        <button
+                                            onClick={() => setIsLogTradeOpen(true)}
+                                            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 active:scale-95"
+                                        >
+                                            <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                            </svg>
+                                            Log Trade
+                                        </button>
                                     </div>
 
                                     {analytics && (
@@ -287,7 +298,7 @@ export default function AccountDashboard({ accountId, account, trades, analytics
                                         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                                             <div className="flex gap-6 items-center px-4 py-3 bg-muted/40 rounded-2xl border border-border/50">
                                                 <div className="flex flex-col">
-                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Initial Balance</span>
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Net Capital</span>
                                                     <span className="text-lg font-bold text-foreground">${account.initialBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                                 </div>
                                                 <div className="h-8 w-px bg-border/50" />
@@ -388,6 +399,13 @@ export default function AccountDashboard({ accountId, account, trades, analytics
                     </div>
                 </div>
             </div>
+            {isLogTradeOpen && (
+                <LogTradeForm
+                    accountId={accountId}
+                    balance={account.currentBalance}
+                    close={() => setIsLogTradeOpen(false)}
+                />
+            )}
         </div>
     );
 }

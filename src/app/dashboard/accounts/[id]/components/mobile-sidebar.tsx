@@ -1,9 +1,11 @@
 'use client';
 
 import React from 'react';
-import { X, Home } from 'lucide-react';
+import { X, Home, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { ViewType, menuItems } from './glass-sidebar';
+import Image from 'next/image';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 interface MobileSidebarProps {
     accountId: string;
@@ -11,9 +13,10 @@ interface MobileSidebarProps {
     onViewChange: (view: ViewType) => void;
     isOpen: boolean;
     onClose: () => void;
+    onLogTradeToggle?: () => void;
 }
 
-export default function MobileSidebar({ accountId, currentView, onViewChange, isOpen, onClose }: MobileSidebarProps) {
+export default function MobileSidebar({ accountId, currentView, onViewChange, isOpen, onClose, onLogTradeToggle }: MobileSidebarProps) {
     if (!isOpen) return null;
 
     return (
@@ -23,12 +26,18 @@ export default function MobileSidebar({ accountId, currentView, onViewChange, is
                 <div className="p-6 border-b border-white/10 space-y-6">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
-                                <span className="text-xl">📊</span>
+                            <div className="h-10 w-10 rounded-xl overflow-hidden bg-white flex items-center justify-center shadow-lg">
+                                <Image
+                                    src="/logo.jpg"
+                                    alt="Smart Journaling Logo"
+                                    width={40}
+                                    height={40}
+                                    className="object-cover"
+                                />
                             </div>
                             <div>
-                                <h3 className="text-sm font-semibold text-foreground">Dashboard</h3>
-                                <p className="text-xs text-muted-foreground">Quick Navigation</p>
+                                <h3 className="text-sm font-bold text-foreground">Smart Journaling</h3>
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Trading Dashboard</p>
                             </div>
                         </div>
                         <button
@@ -40,15 +49,30 @@ export default function MobileSidebar({ accountId, currentView, onViewChange, is
                         </button>
                     </div>
 
-                    <Link
-                        href="/dashboard"
-                        className="flex items-center gap-3 w-full p-3 rounded-xl border border-white/10 glass-card hover:bg-white/10 transition-all duration-300 group"
-                    >
-                        <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center group-hover:bg-blue-500/20 group-hover:text-blue-400 transition-all">
-                            <Home className="h-5 w-5" />
-                        </div>
-                        <span className="font-medium text-muted-foreground group-hover:text-foreground">Exit Account</span>
-                    </Link>
+                    <div className="space-y-3">
+                        <Link
+                            href="/dashboard"
+                            className="flex items-center gap-3 w-full p-3 rounded-xl border border-white/10 glass-card hover:bg-white/10 transition-all duration-300 group"
+                        >
+                            <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center group-hover:bg-blue-500/20 group-hover:text-blue-400 transition-all">
+                                <Home className="h-5 w-5" />
+                            </div>
+                            <span className="font-medium text-muted-foreground group-hover:text-foreground">Exit Account</span>
+                        </Link>
+
+                        <button
+                            onClick={() => {
+                                onLogTradeToggle?.();
+                                onClose();
+                            }}
+                            className="flex items-center gap-3 w-full p-3 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-all duration-300 group"
+                        >
+                            <div className="h-10 w-10 rounded-lg bg-blue-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 group-hover:scale-110 transition-transform">
+                                <Plus className="h-5 w-5" />
+                            </div>
+                            <span className="font-bold text-blue-400 group-hover:text-blue-300 text-sm">Log Future Trade</span>
+                        </button>
+                    </div>
                 </div>
 
                 <nav className="p-6 space-y-3">
@@ -89,6 +113,12 @@ export default function MobileSidebar({ accountId, currentView, onViewChange, is
                         );
                     })}
                 </nav>
+                <div className="mt-auto p-6 border-t border-white/10">
+                    <div className="flex items-center justify-between mb-4">
+                        <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground whitespace-nowrap">Appearance</span>
+                        <ThemeToggle />
+                    </div>
+                </div>
             </div>
         </div>
     );
