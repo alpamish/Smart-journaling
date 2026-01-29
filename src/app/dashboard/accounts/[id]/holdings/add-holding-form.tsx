@@ -200,6 +200,7 @@ export default function AddHoldingForm({ accountId, close }: { accountId: string
             {showSymbolSelector && (
                 <SymbolSelector
                     isFutures={false}
+                    segment="CRYPTO"
                     onSelect={handleSymbolSelect}
                     onClose={() => setShowSymbolSelector(false)}
                 />

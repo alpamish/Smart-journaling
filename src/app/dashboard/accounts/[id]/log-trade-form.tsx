@@ -268,6 +268,8 @@ export default function LogTradeForm({ accountId, balance, close }: { accountId:
                                         <option value="CRYPTO">Crypto</option>
                                         <option value="STOCK">Stock</option>
                                         <option value="FOREX">Forex</option>
+                                        <option value="COMMODITY">Commodity</option>
+                                        <option value="FUTURES">Futures</option>
                                     </select>
                                 </div>
                                 <div>
@@ -311,14 +313,14 @@ export default function LogTradeForm({ accountId, balance, close }: { accountId:
                                                 name="symbol"
                                                 value={symbol}
                                                 onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                                                onFocus={() => setShowSymbolSelector(true)}
+                                                onFocus={() => segment === 'CRYPTO' && setShowSymbolSelector(true)}
                                                 required
-                                                placeholder="BTCUSDT"
+                                                placeholder={segment === 'CRYPTO' ? "BTCUSDT" : "Enter Symbol"}
                                                 className="form-input pr-10 uppercase font-bold tracking-wide"
                                             />
-                                            <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none" />
+                                            {segment === 'CRYPTO' && <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none" />}
                                         </div>
-                                        {currentPrice && (
+                                        {segment === 'CRYPTO' && currentPrice && (
                                             <p className="text-[13px] text-slate-400 mt-1.5">
                                                 <span>Current Price:</span>
                                                 <span className="font-mono font-medium text-blue-400 ml-2">${parseFloat(currentPrice).toLocaleString()}</span>
@@ -719,7 +721,8 @@ export default function LogTradeForm({ accountId, balance, close }: { accountId:
             {
                 showSymbolSelector && (
                     <SymbolSelector
-                        isFutures={true}
+                        isFutures={segment === 'CRYPTO'}
+                        segment={segment as any}
                         onSelect={handleSymbolSelect}
                         onClose={() => setShowSymbolSelector(false)}
                     />

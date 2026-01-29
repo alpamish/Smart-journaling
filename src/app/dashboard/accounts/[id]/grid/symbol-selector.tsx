@@ -2,22 +2,17 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Search, TrendingUp, TrendingDown, X } from 'lucide-react';
-import {
-    fetchSpotTradingPairs,
-    fetchFuturesTradingPairs,
-    TradingPair,
-    formatPrice,
-    formatVolume
-} from '@/app/lib/binance-api';
+import { MarketSymbol, MarketSegment, fetchSymbols, searchSymbols, formatPrice, formatVolume } from '@/app/lib/market-api';
 
 interface SymbolSelectorProps {
     isFutures: boolean;
+    segment: MarketSegment;
     onSelect: (symbol: string, currentPrice: string) => void;
     onClose: () => void;
 }
 
-export default function SymbolSelector({ isFutures, onSelect, onClose }: SymbolSelectorProps) {
-    const [pairs, setPairs] = useState<TradingPair[]>([]);
+export default function SymbolSelector({ isFutures, segment, onSelect, onClose }: SymbolSelectorProps) {
+    const [pairs, setPairs] = useState<MarketSymbol[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<'all' | 'favorites'>('all');
@@ -25,15 +20,31 @@ export default function SymbolSelector({ isFutures, onSelect, onClose }: SymbolS
     useEffect(() => {
         const loadPairs = async () => {
             setLoading(true);
-            const data = isFutures
-                ? await fetchFuturesTradingPairs()
-                : await fetchSpotTradingPairs();
+            const data = await fetchSymbols(segment, isFutures);
             setPairs(data);
             setLoading(false);
         };
 
         loadPairs();
-    }, [isFutures]);
+    }, [isFutures, segment]);
+
+    useEffect(() => {
+        if (!searchQuery) return;
+
+        const delayDebounceFn = setTimeout(async () => {
+            setLoading(true);
+            const searchResults = await searchSymbols(searchQuery, segment);
+            setPairs(prev => {
+                // Merge search results with current list, avoiding duplicates
+                const existingSymbols = new Set(prev.map(p => p.symbol));
+                const newOnes = searchResults.filter(r => !existingSymbols.has(r.symbol));
+                return [...prev, ...newOnes];
+            });
+            setLoading(false);
+        }, 500);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchQuery, segment]);
 
     const filteredPairs = useMemo(() => {
         let filtered = pairs;
@@ -42,7 +53,7 @@ export default function SymbolSelector({ isFutures, onSelect, onClose }: SymbolS
         if (searchQuery) {
             filtered = filtered.filter(pair =>
                 pair.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                pair.baseAsset.toLowerCase().includes(searchQuery.toLowerCase())
+                pair.name.toLowerCase().includes(searchQuery.toLowerCase())
             );
         }
 
@@ -50,11 +61,7 @@ export default function SymbolSelector({ isFutures, onSelect, onClose }: SymbolS
         return searchQuery ? filtered : filtered.slice(0, 50);
     }, [pairs, searchQuery]);
 
-    const popularPairs = useMemo(() => {
-        return ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT'];
-    }, []);
-
-    const handleSelect = (pair: TradingPair) => {
+    const handleSelect = (pair: MarketSymbol) => {
         onSelect(pair.symbol, pair.price);
         onClose();
     };
@@ -92,25 +99,20 @@ export default function SymbolSelector({ isFutures, onSelect, onClose }: SymbolS
                         />
                     </div>
 
-                    {/* Popular Pairs */}
+                    {/* Segment Specific Info */}
                     {!searchQuery && (
                         <div className="mt-3">
-                            <p className="text-xs text-[#848e9c] font-bold uppercase tracking-wider mb-2">Popular</p>
+                            <p className="text-xs text-[#848e9c] font-bold uppercase tracking-wider mb-2">Popular {segment}</p>
                             <div className="flex flex-wrap gap-2">
-                                {popularPairs.map(symbol => {
-                                    const pair = pairs.find(p => p.symbol === symbol);
-                                    if (!pair) return null;
-
-                                    return (
-                                        <button
-                                            key={symbol}
-                                            onClick={() => handleSelect(pair)}
-                                            className="px-3 py-1.5 bg-[#1e2026] hover:bg-[#2b2f36] border border-[#2b2f36] hover:border-[#f0b90b]/30 rounded-lg text-xs font-bold text-[#eaecef] transition-all hover:scale-105 active:scale-95"
-                                        >
-                                            {pair.baseAsset}
-                                        </button>
-                                    );
-                                })}
+                                {pairs.slice(0, 10).map(pair => (
+                                    <button
+                                        key={pair.symbol}
+                                        onClick={() => handleSelect(pair)}
+                                        className="px-3 py-1.5 bg-[#1e2026] hover:bg-[#2b2f36] border border-[#2b2f36] hover:border-[#f0b90b]/30 rounded-lg text-xs font-bold text-[#eaecef] transition-all hover:scale-105 active:scale-95"
+                                    >
+                                        {pair.symbol.replace('USDT', '')}
+                                    </button>
+                                ))}
                             </div>
                         </div>
                     )}
@@ -138,7 +140,7 @@ export default function SymbolSelector({ isFutures, onSelect, onClose }: SymbolS
                     ) : (
                         <div className="divide-y divide-[#2b2f36]">
                             {filteredPairs.map((pair) => {
-                                const priceChange = parseFloat(pair.priceChangePercent);
+                                const priceChange = parseFloat(pair.changePercent);
                                 const isPositive = priceChange >= 0;
 
                                 return (
@@ -151,11 +153,12 @@ export default function SymbolSelector({ isFutures, onSelect, onClose }: SymbolS
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <span className="font-bold text-sm text-white group-hover:text-[#f0b90b] transition-colors">
-                                                        {pair.baseAsset}
+                                                        {pair.symbol}
                                                     </span>
-                                                    <span className="text-xs text-[#848e9c]">/{pair.quoteAsset}</span>
+                                                    <span className="text-xs text-[#848e9c]">{pair.name !== pair.symbol ? `• ${pair.name}` : ''}</span>
                                                 </div>
                                                 <div className="flex items-center gap-3 text-xs text-[#848e9c]">
+                                                    {pair.exchange && <span>{pair.exchange}</span>}
                                                     <span>Vol: {formatVolume(pair.volume)}</span>
                                                 </div>
                                             </div>

@@ -628,6 +628,7 @@ export default function CreateGridForm({ accountId, balance, close }: { accountI
             {showSymbolSelector && (
                 <SymbolSelector
                     isFutures={strategyType === 'FUTURES'}
+                    segment="CRYPTO"
                     onSelect={handleSymbolSelect}
                     onClose={() => setShowSymbolSelector(false)}
                 />
