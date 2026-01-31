@@ -27,14 +27,12 @@ export default async function Page() {
             {/* Main Sidebar (Glass effect inspired by Account Dashboard) */}
             <aside className="hidden lg:flex flex-col w-72 h-screen sticky top-0 glass-sidebar p-6 z-50">
                 <div className="flex items-center gap-3 mb-10 px-2 transition-all duration-300 hover:scale-105">
-                    <div className="relative w-10 h-10 rounded-xl overflow-hidden shadow-2xl shadow-blue-500/20">
-                        <Image
-                            width={80}
-                            height={80}
-                            src="/logo.jpg"
-                            alt="Smart Journaling Logo"
-                            className="object-cover h-10 w-10"
-                        />
+                    <div className="w-10 h-10 rounded-xl overflow-hidden shadow-2xl shadow-blue-500/20">
+                      <img
+                        src="/logo.jpg"
+                        alt="Smart Journaling Logo"
+                        className="h-full w-full object-cover"
+                      />
                     </div>
                     <div>
                         <h2 className="text-lg font-bold tracking-tight">Smart Journal</h2>
