@@ -99,13 +99,13 @@ export default function GlassSidebar({
                         {!isCollapsed && (
                             <div className="flex items-center gap-3">
                                 <div className="h-10 w-10 rounded-xl overflow-hidden bg-white flex items-center justify-center shadow-lg">
-                                    <Image
+                                    {/* <Image
                                         width={80}
                                         height={80}
                                         src="/logo.jpg"
                                         alt="Smart Journaling Logo"
                                         className="object-cover h-10 w-10"
-                                    />
+                                    /> */}
                                 </div>
                                 <div className="min-w-0">
                                     <h3 className="text-sm font-bold text-foreground truncate">Smart Journaling</h3>
