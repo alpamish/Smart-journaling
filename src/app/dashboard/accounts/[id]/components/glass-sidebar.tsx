@@ -100,11 +100,11 @@ export default function GlassSidebar({
                             <div className="flex items-center gap-3">
                                 <div className="h-10 w-10 rounded-xl overflow-hidden bg-white flex items-center justify-center shadow-lg">
                                     <Image
+                                        width={80}
+                                        height={80}
                                         src="/logo.jpg"
                                         alt="Smart Journaling Logo"
-                                        width={40}
-                                        height={40}
-                                        className="object-cover"
+                                        className="object-cover h-10 w-10"
                                     />
                                 </div>
                                 <div className="min-w-0">

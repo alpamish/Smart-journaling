@@ -4,7 +4,7 @@ import React from 'react';
 import { X, Home, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { ViewType, menuItems } from './glass-sidebar';
-import Image from 'next/image';
+// import Image from 'next/image';
 import { ThemeToggle } from '@/components/theme-toggle';
 
 interface MobileSidebarProps {
@@ -27,12 +27,10 @@ export default function MobileSidebar({ accountId, currentView, onViewChange, is
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="h-10 w-10 rounded-xl overflow-hidden bg-white flex items-center justify-center shadow-lg">
-                                <Image
+                                <img
                                     src="/logo.jpg"
                                     alt="Smart Journaling Logo"
-                                    width={40}
-                                    height={40}
-                                    className="object-cover"
+                                    className="h-10 w-10 object-cover"
                                 />
                             </div>
                             <div>

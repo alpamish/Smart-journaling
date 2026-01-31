@@ -29,10 +29,11 @@ export default async function Page() {
                 <div className="flex items-center gap-3 mb-10 px-2 transition-all duration-300 hover:scale-105">
                     <div className="relative w-10 h-10 rounded-xl overflow-hidden shadow-2xl shadow-blue-500/20">
                         <Image
+                            width={80}
+                            height={80}
                             src="/logo.jpg"
-                            alt="Logo"
-                            fill
-                            className="object-cover"
+                            alt="Smart Journaling Logo"
+                            className="object-cover h-10 w-10"
                         />
                     </div>
                     <div>
