@@ -7,8 +7,7 @@ import { auth } from '@/auth'; // Added auth import
 import bcrypt from 'bcryptjs';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import fs from 'node:fs/promises';
-import path from 'node:path';
+import { supabase } from '@/lib/supabase';
 
 export async function authenticate(
     prevState: string | undefined,
@@ -260,14 +259,29 @@ export async function createTrade(
         const files = formData.getAll('images') as File[];
         for (const file of files) {
             if (file.size > 0 && file.name) {
-                const buffer = Buffer.from(await file.arrayBuffer());
-                const fileName = `${Date.now()}-${file.name}`;
-                const filePath = path.join(process.cwd(), 'public/uploads', fileName);
-                await fs.writeFile(filePath, buffer);
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+                const buffer = await file.arrayBuffer();
+
+                const { data, error: uploadError } = await supabase.storage
+                    .from('trade-images')
+                    .upload(fileName, buffer, {
+                        contentType: file.type,
+                        upsert: false
+                    });
+
+                if (uploadError) {
+                    console.error('Supabase Storage Error:', uploadError);
+                    continue;
+                }
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from('trade-images')
+                    .getPublicUrl(fileName);
 
                 await prisma.image.create({
                     data: {
-                        url: `/uploads/${fileName}`,
+                        url: publicUrl,
                         tradeId: trade.id
                     }
                 });
